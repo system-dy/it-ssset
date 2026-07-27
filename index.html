@@ -92,10 +92,13 @@
                 </button>
             </nav>
             <div class="p-4 border-t border-slate-800 flex items-center justify-between">
-                <div class="text-xs text-slate-400 flex items-center space-x-2">
-                    <span class="w-2 h-2 rounded-full flex-shrink-0"
-                          :class="dbStatus === 'online' ? 'bg-emerald-400' : (dbStatus === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-rose-500')"></span>
-                    <span x-text="dbStatus === 'online' ? 'Database: Online (Firebase)' : (dbStatus === 'connecting' ? 'Database: Connecting...' : 'Database: Offline')"></span>
+                <div class="text-xs text-slate-400 flex flex-col space-y-1" :title="dbError">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-2 h-2 rounded-full flex-shrink-0"
+                              :class="dbStatus === 'online' ? 'bg-emerald-400' : (dbStatus === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-rose-500')"></span>
+                        <span x-text="dbStatus === 'online' ? 'Database: Online (Firebase)' : (dbStatus === 'connecting' ? 'Database: Connecting...' : 'Database: Offline')"></span>
+                    </div>
+                    <span x-show="dbError" class="text-rose-400 text-[11px] break-words max-w-[180px]" x-text="dbError" style="display: none;"></span>
                 </div>
                 <button @click="logout()" class="text-rose-400 hover:text-rose-300 text-sm p-1.5 rounded transition" title="ออกจากระบบ">
                     <i class="fa-solid fa-right-from-bracket"></i>
@@ -619,8 +622,14 @@
            
         };
 
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+        let db;
+        try {
+            firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+        } catch (error) {
+            console.error('[Firebase Init Error]', error);
+            alert('ไม่สามารถเชื่อมต่อ Firebase ได้: ' + error.message + '\nกรุณาตรวจสอบค่า firebaseConfig');
+        }
     </script>
 
     <!-- Script Application Logic -->
@@ -2811,6 +2820,7 @@
                 auditLogs: [],
                 form: {},
                 dbStatus: 'connecting', // 'connecting' | 'online' | 'offline'
+                dbError: '', // ข้อความ error ล่าสุดจาก Firebase (ถ้ามี) เพื่อช่วยดีบัก
 
                 init() {
                     const sessionUser = sessionStorage.getItem('it_asset_logged_user');
@@ -2847,50 +2857,67 @@
                     }];
                 },
 
+                // Helper กลาง: ใช้ตรวจจับ error จาก Firebase ทุกจุด แล้วโชว์ให้เห็นแทนที่จะเงียบหาย
+                handleDbError(context, error) {
+                    console.error(`[Firebase Error] ${context}:`, error);
+                    this.dbStatus = 'offline';
+                    this.dbError = `${context}: ${error && error.message ? error.message : error}`;
+                },
+
                 initFirebase() {
                     // สถานะการเชื่อมต่อ Realtime Database
                     db.ref('.info/connected').on('value', (snap) => {
                         this.dbStatus = snap.val() === true ? 'online' : 'offline';
-                    });
+                    }, (error) => this.handleDbError('.info/connected', error));
 
                     // seed ข้อมูลเริ่มต้นเฉพาะครั้งแรกที่ยังไม่มีข้อมูลใน Firebase เลย
                     db.ref('assets').once('value').then((snap) => {
                         if (!snap.exists()) {
-                            db.ref('assets').set(this.getDefaultAssets());
+                            db.ref('assets').set(this.getDefaultAssets())
+                                .catch((error) => this.handleDbError('seed assets', error));
                         }
-                    });
+                    }).catch((error) => this.handleDbError('read assets (seed check)', error));
+
                     db.ref('users/validUsers').once('value').then((snap) => {
                         if (!snap.exists()) {
-                            db.ref('users/validUsers').set(this.validUsers);
+                            db.ref('users/validUsers').set(this.validUsers)
+                                .catch((error) => this.handleDbError('seed validUsers', error));
                         }
-                    });
+                    }).catch((error) => this.handleDbError('read validUsers (seed check)', error));
+
                     db.ref('users/userWarehouses').once('value').then((snap) => {
                         if (!snap.exists()) {
-                            db.ref('users/userWarehouses').set(this.userWarehouses);
+                            db.ref('users/userWarehouses').set(this.userWarehouses)
+                                .catch((error) => this.handleDbError('seed userWarehouses', error));
                         }
-                    });
+                    }).catch((error) => this.handleDbError('read userWarehouses (seed check)', error));
 
                     // ฟังการเปลี่ยนแปลงข้อมูลแบบเรียลไทม์
                     db.ref('assets').on('value', (snap) => {
                         const val = snap.val();
                         this.assets = val ? (Array.isArray(val) ? val : Object.values(val)) : [];
-                    });
+                    }, (error) => this.handleDbError('listen assets', error));
+
                     db.ref('users/validUsers').on('value', (snap) => {
                         const val = snap.val();
                         if (val) this.validUsers = val;
-                    });
+                    }, (error) => this.handleDbError('listen validUsers', error));
+
                     db.ref('users/userWarehouses').on('value', (snap) => {
                         this.userWarehouses = snap.val() || {};
-                    });
+                    }, (error) => this.handleDbError('listen userWarehouses', error));
+
                     db.ref('logs').on('value', (snap) => {
                         const val = snap.val();
                         this.auditLogs = val ? (Array.isArray(val) ? val : Object.values(val)) : [];
-                    });
+                    }, (error) => this.handleDbError('listen logs', error));
                 },
 
                 saveUsersToStorage() {
-                    db.ref('users/validUsers').set(this.validUsers);
-                    db.ref('users/userWarehouses').set(this.userWarehouses);
+                    db.ref('users/validUsers').set(this.validUsers)
+                        .catch((error) => this.handleDbError('save validUsers', error));
+                    db.ref('users/userWarehouses').set(this.userWarehouses)
+                        .catch((error) => this.handleDbError('save userWarehouses', error));
                 },
 
                 logAction(actionType, serialNo, detailText) {
@@ -2910,7 +2937,8 @@
 
                     this.auditLogs.unshift(newLog);
                     if (this.auditLogs.length > 50) this.auditLogs.pop();
-                    db.ref('logs').set(this.auditLogs);
+                    db.ref('logs').set(this.auditLogs)
+                        .catch((error) => this.handleDbError('save logs', error));
                     this.logCurrentPage = 1;
                 },
 
@@ -2926,7 +2954,8 @@
 
                 clearLogs() {
                     this.auditLogs = [];
-                    db.ref('logs').remove();
+                    db.ref('logs').remove()
+                        .catch((error) => this.handleDbError('clear logs', error));
                     this.logCurrentPage = 1;
                     this.showClearLogModal = false;
                 },
@@ -2968,9 +2997,11 @@
 
                 saveToStorage() {
                     if (this.assets.length === 0) {
-                        db.ref('assets').remove();
+                        db.ref('assets').remove()
+                            .catch((error) => this.handleDbError('remove assets', error));
                     } else {
-                        db.ref('assets').set(this.assets);
+                        db.ref('assets').set(this.assets)
+                            .catch((error) => this.handleDbError('save assets', error));
                     }
                 },
 
