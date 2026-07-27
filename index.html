@@ -412,7 +412,18 @@
                             </div>
                         </template>
 
-                        <template x-if="col !== 'Warehouse' && col !== 'Transfer / Use'">
+                        <template x-if="col === 'Action'">
+                            <div>
+                                <input type="text" x-model="form[col]" list="actionList" placeholder="เลือกหรือพิมพ์ข้อมูล..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                                <datalist id="actionList">
+                                    <template x-for="opt in actionOptions" :key="opt">
+                                        <option :value="opt"></option>
+                                    </template>
+                                </datalist>
+                            </div>
+                        </template>
+
+                        <template x-if="col !== 'Warehouse' && col !== 'Transfer / Use' && col !== 'Action'">
                             <input type="text" x-model="form[col]" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         </template>
                     </div>
@@ -696,6 +707,13 @@
                     '11217-กาฬสินธุ์',
                     '11231-หนองคาย',
                     '11233-โคราช 2'
+                ],
+
+                actionOptions: [
+                    "Auction",
+                    "Write off",
+                    "Transfer",
+                    "Loss"
                 ],
 
                 transferUseOptions: [
