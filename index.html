@@ -630,6 +630,51 @@
             console.error('[Firebase Init Error]', error);
             alert('ไม่สามารถเชื่อมต่อ Firebase ได้: ' + error.message + '\nกรุณาตรวจสอบค่า firebaseConfig');
         }
+
+        // Firebase Realtime Database ไม่อนุญาตให้ key มีอักขระ '.', '#', '$', '/', '[', ']'
+        // แต่คอลัมน์ในระบบนี้มีชื่อ เช่น "Transfer / Use" ที่มี '/' อยู่
+        // จึงต้องแปลง (encode) key ก่อนบันทึกขึ้น Firebase และแปลงกลับ (decode) ตอนอ่านออกมาใช้งาน
+        const FIREBASE_KEY_ENCODE_MAP = [
+            ['.', '__DOT__'],
+            ['#', '__HASH__'],
+            ['$', '__DOLLAR__'],
+            ['/', '__SLASH__'],
+            ['[', '__LBRACKET__'],
+            [']', '__RBRACKET__']
+        ];
+
+        function encodeFirebaseKey(key) {
+            let result = key;
+            FIREBASE_KEY_ENCODE_MAP.forEach(([char, token]) => {
+                result = result.split(char).join(token);
+            });
+            return result;
+        }
+
+        function decodeFirebaseKey(key) {
+            let result = key;
+            FIREBASE_KEY_ENCODE_MAP.forEach(([char, token]) => {
+                result = result.split(token).join(char);
+            });
+            return result;
+        }
+
+        // แปลง key ของ object 1 ชั้น (ใช้กับแต่ละแถวของ asset)
+        function encodeAssetKeys(obj) {
+            const result = {};
+            Object.keys(obj).forEach((k) => {
+                result[encodeFirebaseKey(k)] = obj[k];
+            });
+            return result;
+        }
+
+        function decodeAssetKeys(obj) {
+            const result = {};
+            Object.keys(obj).forEach((k) => {
+                result[decodeFirebaseKey(k)] = obj[k];
+            });
+            return result;
+        }
     </script>
 
     <!-- Script Application Logic -->
@@ -2873,7 +2918,7 @@
                     // seed ข้อมูลเริ่มต้นเฉพาะครั้งแรกที่ยังไม่มีข้อมูลใน Firebase เลย
                     db.ref('assets').once('value').then((snap) => {
                         if (!snap.exists()) {
-                            db.ref('assets').set(this.getDefaultAssets())
+                            db.ref('assets').set(this.getDefaultAssets().map(encodeAssetKeys))
                                 .catch((error) => this.handleDbError('seed assets', error));
                         }
                     }).catch((error) => this.handleDbError('read assets (seed check)', error));
@@ -2895,7 +2940,8 @@
                     // ฟังการเปลี่ยนแปลงข้อมูลแบบเรียลไทม์
                     db.ref('assets').on('value', (snap) => {
                         const val = snap.val();
-                        this.assets = val ? (Array.isArray(val) ? val : Object.values(val)) : [];
+                        const rawList = val ? (Array.isArray(val) ? val : Object.values(val)) : [];
+                        this.assets = rawList.map(decodeAssetKeys);
                     }, (error) => this.handleDbError('listen assets', error));
 
                     db.ref('users/validUsers').on('value', (snap) => {
@@ -3000,7 +3046,7 @@
                         db.ref('assets').remove()
                             .catch((error) => this.handleDbError('remove assets', error));
                     } else {
-                        db.ref('assets').set(this.assets)
+                        db.ref('assets').set(this.assets.map(encodeAssetKeys))
                             .catch((error) => this.handleDbError('save assets', error));
                     }
                 },
