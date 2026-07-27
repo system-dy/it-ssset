@@ -1,0 +1,3282 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT Asset Management System</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <!-- Firebase (Realtime Database) CDN -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Sarabun', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans antialiased" x-data="assetApp()">
+
+    <!-- ================= LOGIN SCREEN ================= -->
+    <div x-show="!isLoggedIn" class="flex items-center justify-center h-screen bg-slate-900" style="display: none;">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-md w-full space-y-6">
+            <div class="text-center space-y-2">
+                <div class="w-16 h-16 bg-indigo-600 text-white rounded-2xl flex items-center justify-center mx-auto text-2xl shadow-lg">
+                    <i class="fa-solid fa-server"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-slate-800">IT Asset System</h1>
+                <p class="text-sm text-gray-500">กรุณาเข้าสู่ระบบเพื่อใช้งาน</p>
+            </div>
+
+            <form @submit.prevent="login()" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Username</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fa-solid fa-user"></i></span>
+                        <input type="text" x-model="loginForm.username" placeholder="ระบุชื่อผู้ใช้งาน (เช่น admin)" required class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Password</label>
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fa-solid fa-lock"></i></span>
+                        <input type="password" x-model="loginForm.password" placeholder="ระบุรหัสผ่าน (เช่น 1234)" required class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </div>
+                <template x-if="loginError">
+                    <p class="text-xs text-rose-500 text-center font-medium" x-text="loginError"></p>
+                </template>
+                <button type="submit" class="w-full py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition shadow-md">
+                    เข้าสู่ระบบ
+                </button>
+            </form>
+            <div class="text-center text-xs text-gray-400 bg-gray-50 p-3 rounded-lg border border-gray-100 space-y-1">
+                <div>Developer by : Arthit L. <span class="font-semibold text-slate-700"></span><span class="font-semibold text-slate-700"></span></div>
+            
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= MAIN APP ================= -->
+    <div x-show="isLoggedIn" class="flex h-screen overflow-hidden" style="display: none;">
+        
+        <!-- Sidebar -->
+        <div class="w-64 bg-slate-900 text-white flex flex-col shadow-xl">
+            <div class="p-5 text-xl font-bold tracking-wider border-b border-slate-800 flex items-center space-x-3">
+                <i class="fa-solid fa-server text-indigo-400"></i>
+                <span>IT Asset System</span>
+            </div>
+            <nav class="flex-1 p-4 space-y-2">
+                <button @click="currentTab = 'dashboard'" 
+                    :class="{'bg-indigo-600 text-white': currentTab === 'dashboard', 'text-slate-300 hover:bg-slate-800': currentTab !== 'dashboard'}"
+                    class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition font-medium text-left">
+                    <i class="fa-solid fa-chart-pie w-5"></i>
+                    <span>Dashboard</span>
+                </button>
+                <button @click="currentTab = 'assets'" 
+                    :class="{'bg-indigo-600 text-white': currentTab === 'assets', 'text-slate-300 hover:bg-slate-800': currentTab !== 'assets'}"
+                    class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition font-medium text-left">
+                    <i class="fa-solid fa-laptop-code w-5"></i>
+                    <span>Asset Management</span>
+                </button>
+                
+                <!-- เมนู User & Warehouse Settings (แสดงเฉพาะ Admin) -->
+                <button x-show="currentUser === 'admin'" @click="currentTab = 'users'" 
+                    :class="{'bg-indigo-600 text-white': currentTab === 'users', 'text-slate-300 hover:bg-slate-800': currentTab !== 'users'}"
+                    class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition font-medium text-left" style="display: none;">
+                    <i class="fa-solid fa-users-gear w-5"></i>
+                    <span>User Setting</span>
+                </button>
+            </nav>
+            <div class="p-4 border-t border-slate-800 flex items-center justify-between">
+                <div class="text-xs text-slate-400 flex items-center space-x-2">
+                    <span class="w-2 h-2 rounded-full flex-shrink-0"
+                          :class="dbStatus === 'online' ? 'bg-emerald-400' : (dbStatus === 'connecting' ? 'bg-amber-400 animate-pulse' : 'bg-rose-500')"></span>
+                    <span x-text="dbStatus === 'online' ? 'Database: Online (Firebase)' : (dbStatus === 'connecting' ? 'Database: Connecting...' : 'Database: Offline')"></span>
+                </div>
+                <button @click="logout()" class="text-rose-400 hover:text-rose-300 text-sm p-1.5 rounded transition" title="ออกจากระบบ">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            
+            <!-- Top Header -->
+            <header class="bg-white shadow-sm h-16 flex items-center justify-between px-6 z-10">
+                <div class="text-xl font-semibold text-slate-800" x-text="getHeaderTitle()"></div>
+                <div class="flex items-center space-x-3">
+                    <span class="text-sm text-slate-600 font-medium" x-text="currentUser"></span>
+                    <div class="w-9 h-9 bg-indigo-500 rounded-full flex items-center justify-center text-white font-bold uppercase" x-text="currentUser.charAt(0)"></div>
+                </div>
+            </header>
+
+            <!-- Main View Container -->
+            <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
+                
+                <!-- ================= DASHBOARD TAB ================= -->
+                <div x-show="currentTab === 'dashboard'" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">Total Assets</p>
+                                <h3 class="text-3xl font-bold text-slate-800 mt-1" x-text="filteredAssets.length">0</h3>
+                            </div>
+                            <div class="p-4 bg-indigo-50 text-indigo-600 rounded-xl text-xl"><i class="fa-solid fa-boxes-stacked"></i></div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">Transfer / Use</p>
+                                <h3 class="text-3xl font-bold text-emerald-600 mt-1" x-text="filteredAssets.filter(a => a['Transfer / Use'] && a['Transfer / Use'].trim() !== '').length">0</h3>
+                            </div>
+                            <div class="p-4 bg-emerald-50 text-emerald-600 rounded-xl text-xl"><i class="fa-solid fa-arrows-rotate"></i></div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">Warehouses</p>
+                                <h3 class="text-3xl font-bold text-blue-600 mt-1" x-text="[...new Set(filteredAssets.map(a => a.Warehouse))].filter(Boolean).length">0</h3>
+                            </div>
+                            <div class="p-4 bg-blue-50 text-blue-600 rounded-xl text-xl"><i class="fa-solid fa-warehouse"></i></div>
+                        </div>
+                        <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">Branches</p>
+                                <h3 class="text-3xl font-bold text-amber-600 mt-1" x-text="[...new Set(filteredAssets.map(a => a['Branch Code']))].filter(Boolean).length">0</h3>
+                            </div>
+                            <div class="p-4 bg-amber-50 text-amber-600 rounded-xl text-xl"><i class="fa-solid fa-code-branch"></i></div>
+                        </div>
+                    </div>
+
+                    <!-- Activity Log Section -->
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <div class="p-2 bg-slate-100 text-slate-700 rounded-lg"><i class="fa-solid fa-clock-rotate-left"></i></div>
+                                <h3 class="text-lg font-bold text-slate-800">แสดงรายการการปรับปรุงข้อมูลล่าสุด</h3>
+                            </div>
+                            <button @click="confirmClearLogs()" x-show="auditLogs.length > 0"
+                                class="flex items-center space-x-2 px-3 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs font-medium hover:bg-rose-100 transition">
+                                <i class="fa-solid fa-trash-can"></i>
+                                <span>Clear Log</span>
+                            </button>
+                        </div>
+
+                        <div class="overflow-x-auto border border-gray-200 rounded-xl">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead class="bg-slate-100 text-slate-700">
+                                    <tr>
+                                        <th class="px-4 py-3 font-semibold">วัน-เวลา</th>
+                                        <th class="px-4 py-3 font-semibold">ผู้ใช้งาน</th>
+                                        <th class="px-4 py-3 font-semibold">การกระทำ</th>
+                                        <th class="px-4 py-3 font-semibold">Serial No</th>
+                                        <th class="px-4 py-3 font-semibold">รายละเอียด</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200 bg-white">
+                                    <template x-for="(log, index) in paginatedLogs" :key="index">
+                                        <tr class="hover:bg-gray-50 transition">
+                                            <td class="px-4 py-2.5 text-gray-500 whitespace-nowrap" x-text="log.timestamp"></td>
+                                            <td class="px-4 py-2.5 font-medium text-slate-700" x-text="log.user"></td>
+                                            <td class="px-4 py-2.5 whitespace-nowrap">
+                                                <span class="px-2 py-0.5 rounded-full text-[11px] font-semibold"
+                                                    :class="{
+                                                        'bg-emerald-100 text-emerald-700': log.action === 'ADD',
+                                                        'bg-blue-100 text-blue-700': log.action === 'EDIT',
+                                                        'bg-rose-100 text-rose-700': log.action === 'DELETE',
+                                                        'bg-purple-100 text-purple-700': log.action === 'IMPORT'
+                                                    }" 
+                                                    x-text="log.action">
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-2.5 font-mono text-slate-800 font-semibold" x-text="log.serialNo"></td>
+                                            <td class="px-4 py-2.5 text-gray-600" x-text="log.detail"></td>
+                                        </tr>
+                                    </template>
+                                    <template x-if="auditLogs.length === 0">
+                                        <tr>
+                                            <td colspan="5" class="text-center py-8 text-gray-400">ยังไม่มีประวัติการเปลี่ยนแปลงข้อมูล</td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Log Pagination Bar -->
+                        <div x-show="auditLogs.length > 0" class="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-600">
+                            <div>
+                                แสดง <span class="font-semibold text-slate-800" x-text="auditLogs.length > 0 ? (logCurrentPage - 1) * logItemsPerPage + 1 : 0"></span> ถึง <span class="font-semibold text-slate-800" x-text="Math.min(logCurrentPage * logItemsPerPage, auditLogs.length)"></span> จากทั้งหมด <span class="font-semibold text-slate-800" x-text="auditLogs.length"></span> รายการ
+                            </div>
+                            <div class="flex items-center space-x-1">
+                                <button @click="changeLogPage(logCurrentPage - 1)" :disabled="logCurrentPage === 1" class="px-3 py-1.5 border border-gray-300 rounded-md bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    <i class="fa-solid fa-chevron-left"></i> ก่อนหน้า
+                                </button>
+                                <template x-for="page in totalLogPages" :key="page">
+                                    <button @click="changeLogPage(page)" 
+                                        :class="{'bg-indigo-600 text-white border-indigo-600': logCurrentPage === page, 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50': logCurrentPage !== page}"
+                                        class="px-3 py-1.5 border rounded-md font-medium transition" x-text="page">
+                                    </button>
+                                </template>
+                                <button @click="changeLogPage(logCurrentPage + 1)" :disabled="logCurrentPage === totalLogPages || totalLogPages === 0" class="px-3 py-1.5 border border-gray-300 rounded-md bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    ถัดไป <i class="fa-solid fa-chevron-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= ASSET MANAGEMENT TAB ================= -->
+                <div x-show="currentTab === 'assets'" class="space-y-6">
+                    
+                    <!-- Action Toolbar -->
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-wrap items-center justify-between gap-4">
+                        <div class="flex items-center space-x-3 w-full md:w-auto flex-1">
+                            <div class="relative w-full md:w-80">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fa-solid fa-search"></i></span>
+                                <input type="text" x-model="searchQuery" @input="currentPage = 1" placeholder="Search assets (Code, Name, Serial)..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <!-- ปุ่มลบหลายรายการ (แสดงเฉพาะ Admin)[cite: 1] -->
+                            <button x-show="currentUser === 'admin'" @click="confirmBulkDelete()" :disabled="selectedAssets.length === 0" class="px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-700 transition flex items-center space-x-2 disabled:opacity-40 disabled:cursor-not-allowed" style="display: none;">
+                                <i class="fa-solid fa-trash-can"></i><span>Delete Selected (<span x-text="selectedAssets.length"></span>)</span>
+                            </button>
+
+                            <button @click="openModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center space-x-2">
+                                <i class="fa-solid fa-plus"></i><span>Add New Asset</span>
+                            </button>
+                            <label class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition cursor-pointer flex items-center space-x-2">
+                                <i class="fa-solid fa-file-import"></i><span>Import CSV</span>
+                                <input type="file" accept=".csv" @change="previewImportCSV($event)" class="hidden">
+                            </label>
+                            <button @click="exportCSV()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center space-x-2">
+                                <i class="fa-solid fa-file-export"></i><span>Export CSV</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Data Table Card -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+                        <div class="overflow-x-auto" style="max-height: 600px;">
+                            <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
+                                <thead class="bg-slate-800 text-white sticky top-0 z-10">
+                                    <tr>
+                                        <!-- ช่อง Checkbox เลือกทั้งหมด (แสดงเฉพาะ Admin)[cite: 1] -->
+                                        <th x-show="currentUser === 'admin'" class="px-3 py-3 w-10 text-center border-r border-slate-700" style="display: none;">
+                                            <input type="checkbox" @change="toggleSelectAll()" :checked="isAllSelected" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer">
+                                        </th>
+                                        <template x-for="col in columns" :key="col">
+                                            <th class="px-3 py-3 font-semibold uppercase tracking-wider border-r border-slate-700" x-text="col"></th>
+                                        </template>
+                                        <th class="px-3 py-3 font-semibold uppercase tracking-wider text-center sticky right-0 bg-slate-800">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200 bg-white">
+                                    <template x-for="(item, index) in paginatedAssets" :key="index">
+                                        <tr class="hover:bg-indigo-50/55 transition" :class="{'bg-indigo-50/30': selectedAssets.includes(item)}">
+                                            <!-- ช่อง Checkbox เลือกแต่ละรายการ (แสดงเฉพาะ Admin)[cite: 1] -->
+                                            <td x-show="currentUser === 'admin'" class="px-3 py-2.5 text-center border-r border-gray-100" style="display: none;">
+                                                <input type="checkbox" value="" @change="toggleSelectAsset(item)" :checked="selectedAssets.includes(item)" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer">
+                                            </td>
+                                            <template x-for="col in columns" :key="col">
+                                                <td class="px-3 py-2.5 border-r border-gray-100 text-slate-700" x-text="item[col] || '-'"></td>
+                                            </template>
+                                            <td class="px-3 py-2.5 text-center sticky right-0 bg-white shadow-l">
+                                                <button @click="editAsset(item)" class="text-indigo-600 hover:text-indigo-900 mx-1 p-1" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                                                <button @click="confirmDelete(item)" class="text-rose-600 hover:text-rose-900 mx-1 p-1" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                                            </td>
+                                        </tr>
+                                    </template>
+                                    <template x-if="filteredAssets.length === 0">
+                                        <tr>
+                                            <td :colspan="columns.length + (currentUser === 'admin' ? 2 : 1)" class="text-center py-10 text-gray-400">No records found. Click "Add New Asset" or Import CSV.</td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Pagination Bar -->
+                        <div class="px-6 py-4 bg-white border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-600">
+                            <div>
+                                แสดง <span class="font-semibold text-slate-800" x-text="filteredAssets.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0"></span> ถึง <span class="font-semibold text-slate-800" x-text="Math.min(currentPage * itemsPerPage, filteredAssets.length)"></span> จากทั้งหมด <span class="font-semibold text-slate-800" x-text="filteredAssets.length"></span> รายการ
+                            </div>
+                            <div class="flex items-center space-x-1">
+                                <button @click="changePage(currentPage - 1)" :disabled="currentPage === 1" class="px-3 py-1.5 border border-gray-300 rounded-md bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    <i class="fa-solid fa-chevron-left"></i> ก่อนหน้า
+                                </button>
+                                <template x-for="page in totalPages" :key="page">
+                                    <button @click="changePage(page)" 
+                                        :class="{'bg-indigo-600 text-white border-indigo-600': currentPage === page, 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50': currentPage !== page}"
+                                        class="px-3 py-1.5 border rounded-md font-medium transition" x-text="page">
+                                    </button>
+                                </template>
+                                <button @click="changePage(currentPage + 1)" :disabled="currentPage === totalPages || totalPages === 0" class="px-3 py-1.5 border border-gray-300 rounded-md bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                    ถัดไป <i class="fa-solid fa-chevron-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ================= USER & WAREHOUSE MANAGEMENT TAB ================= -->
+                <div x-show="currentUser === 'admin' && currentTab === 'users'" class="space-y-6" style="display: none;">
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex items-center justify-between">
+                        <div>
+                            <h3 class="font-bold text-lg text-slate-800">จัดการผู้ใช้งานและสิทธิ์คลังสินค้า (Warehouse)</h3>
+                            <p class="text-xs text-gray-500">กำหนด Username, Password และสิทธิ์การมองเห็น Warehouse หลายรายการต่อ User</p>
+                        </div>
+                        <button @click="openUserModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center space-x-2">
+                            <i class="fa-solid fa-user-plus"></i><span>เพิ่มผู้ใช้งานใหม่</span>
+                        </button>
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <table class="w-full text-left border-collapse text-sm">
+                            <thead class="bg-slate-800 text-white">
+                                <tr>
+                                    <th class="px-4 py-3 font-semibold">Username</th>
+                                    <th class="px-4 py-3 font-semibold">Password</th>
+                                    <th class="px-4 py-3 font-semibold">Warehouse ที่มีสิทธิ์มองเห็น</th>
+                                    <th class="px-4 py-3 font-semibold text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200 bg-white">
+                                <template x-for="(pass, username) in validUsers" :key="username">
+                                    <tr class="hover:bg-indigo-50/50 transition">
+                                        <td class="px-4 py-3 font-medium text-slate-800" x-text="username"></td>
+                                        <td class="px-4 py-3 text-gray-600 font-mono" x-text="pass"></td>
+                                        <td class="px-4 py-3">
+                                            <div class="flex flex-wrap gap-1">
+                                                <template x-if="!userWarehouses[username] || userWarehouses[username].length === 0">
+                                                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                                                        มองเห็นทั้งหมด (All Warehouses)
+                                                    </span>
+                                                </template>
+                                                <template x-for="wh in (userWarehouses[username] || [])" :key="wh">
+                                                    <span class="px-2 py-0.5 rounded-md text-xs font-medium bg-blue-100 text-blue-700" x-text="wh"></span>
+                                                </template>
+                                            </div>
+                                        </td>
+                                        <td class="px-4 py-3 text-center space-x-2">
+                                            <button @click="editUser(username)" class="text-indigo-600 hover:text-indigo-900 p-1" title="แก้ไข"><i class="fa-solid fa-pen-to-square"></i></button>
+                                            <button @click="confirmDeleteUser(username)" class="text-rose-600 hover:text-rose-900 p-1" :disabled="username === 'admin'" :class="{'opacity-30 cursor-not-allowed': username === 'admin'}" title="ลบ"><i class="fa-solid fa-trash"></i></button>
+                                        </td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal Form for Add / Edit Asset -->
+    <div x-show="showModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto" style="display: none;">
+        <div class="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div class="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+                <h3 class="font-bold text-lg" x-text="isEditMode ? 'Edit IT Asset' : 'Add New IT Asset'"></h3>
+                <button @click="showModal = false" class="text-gray-300 hover:text-white text-xl">&times;</button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <template x-for="col in columns" :key="col">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1" x-text="col"></label>
+                        
+                        <template x-if="col === 'Warehouse'">
+                            <select x-model="form[col]" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                                <option value="">-- เลือก Warehouse --</option>
+                                <template x-for="wh in warehouseOptions" :key="wh">
+                                    <option :value="wh" x-text="wh"></option>
+                                </template>
+                            </select>
+                        </template>
+
+                        <template x-if="col === 'Transfer / Use'">
+                            <div>
+                                <input type="text" x-model="form[col]" list="transferUseList" placeholder="เลือกหรือพิมพ์ข้อมูล..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                                <datalist id="transferUseList">
+                                    <template x-for="opt in transferUseOptions" :key="opt">
+                                        <option :value="opt"></option>
+                                    </template>
+                                </datalist>
+                            </div>
+                        </template>
+
+                        <template x-if="col !== 'Warehouse' && col !== 'Transfer / Use'">
+                            <input type="text" x-model="form[col]" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </template>
+                    </div>
+                </template>
+            </div>
+
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3">
+                <button @click="showModal = false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">Cancel</button>
+                <button @click="saveAsset()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">Save Record</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Warning Popup: Required fields missing -->
+    <div x-show="showValidationWarningModal" x-transition class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" style="display: none;">
+        <div x-show="showValidationWarningModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4">
+            <div class="w-16 h-16 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mx-auto text-2xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="space-y-2">
+                <h3 class="font-bold text-lg text-slate-800">กรุณากรอกข้อมูลให้ครบถ้วน</h3>
+                <p class="text-sm text-gray-500">กรุณาระบุข้อมูลในคอลัมน์ต่อไปนี้ก่อนบันทึกข้อมูลทรัพย์สิน:</p>
+                <ul class="space-y-1.5">
+                    <template x-for="field in missingRequiredFields" :key="field">
+                        <li class="flex items-center justify-center space-x-2 text-sm font-semibold text-amber-600 bg-amber-50 rounded-lg py-1.5">
+                            <i class="fa-solid fa-circle-exclamation text-xs"></i>
+                            <span x-text="field"></span>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+            <button @click="showValidationWarningModal = false" class="w-full px-4 py-2.5 bg-amber-500 text-white rounded-lg text-sm font-semibold hover:bg-amber-600 transition">รับทราบ</button>
+        </div>
+    </div>
+
+    <!-- Modal Form for Add / Edit User -->
+    <div x-show="showUserModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto" style="display: none;">
+        <div class="bg-white rounded-xl shadow-xl max-w-lg w-full overflow-hidden my-8">
+            <div class="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+                <h3 class="font-bold text-lg" x-text="isUserEditMode ? 'แก้ไขข้อมูลผู้ใช้งาน' : 'เพิ่มผู้ใช้งานใหม่'"></h3>
+                <button @click="showUserModal = false" class="text-gray-300 hover:text-white text-xl">&times;</button>
+            </div>
+            <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Username</label>
+                    <input type="text" x-model="userForm.username" :disabled="isUserEditMode" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-100">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-1">Password</label>
+                    <input type="text" x-model="userForm.password" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-700 mb-2">สิทธิ์คลังสินค้า (Warehouse) ที่มองเห็น (เลือกได้มากกว่า 1 รายการ)</label>
+                    <div class="space-y-2 border border-gray-200 p-3 rounded-lg bg-gray-50 max-h-48 overflow-y-auto">
+                        <template x-for="wh in warehouseOptions" :key="wh">
+                            <label class="flex items-center space-x-2 text-sm text-slate-700 cursor-pointer hover:bg-gray-100 p-1 rounded">
+                                <input type="checkbox" :value="wh" x-model="userForm.warehouses" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4">
+                                <span x-text="wh"></span>
+                            </label>
+                        </template>
+                    </div>
+                    <p class="text-[11px] text-gray-400 mt-1">* หากไม่เลือกเลย (ปล่อยว่าง) ระบบจะถือว่ามีสิทธิ์มองเห็นคลังสินค้าทั้งหมด (เหมาะสำหรับ Admin)</p>
+                </div>
+                <template x-if="userFormError">
+                    <p class="text-xs text-rose-500 font-medium" x-text="userFormError"></p>
+                </template>
+            </div>
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3">
+                <button @click="showUserModal = false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">ยกเลิก</button>
+                <button @click="saveUser()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">บันทึก</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmation Popup for Delete Asset -->
+    <div x-show="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style="display: none;">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center space-y-4">
+            <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="font-bold text-lg text-slate-800">ยืนยันการลบรายการ</h3>
+            <p class="text-sm text-gray-600">คุณแน่ใจหรือไม่ว่าต้องการลบอุปกรณ์ Serial: <strong class="text-slate-800" x-text="itemToDelete ? itemToDelete['Serial No'] : ''"></strong> นี้?</p>
+            <div class="flex justify-center space-x-3 pt-2">
+                <button @click="showDeleteModal = false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">ยกเลิก</button>
+                <button @click="deleteAsset()" class="px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-700 transition">ยืนยันการลบ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmation Popup for Bulk Delete Assets -->
+    <div x-show="showBulkDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style="display: none;">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center space-y-4">
+            <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+                <i class="fa-solid fa-trash-can"></i>
+            </div>
+            <h3 class="font-bold text-lg text-slate-800">ยืนยันการลบรายการที่เลือก</h3>
+            <p class="text-sm text-gray-600">คุณแน่ใจหรือไม่ว่าต้องการลบทรัพย์สินที่เลือกจำนวน <strong class="text-rose-600" x-text="selectedAssets.length"></strong> รายการ?</p>
+            <div class="flex justify-center space-x-3 pt-2">
+                <button @click="showBulkDeleteModal = false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">ยกเลิก</button>
+                <button @click="executeBulkDelete()" class="px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-700 transition">ยืนยันการลบทั้งหมด</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmation Popup for Delete User -->
+    <div x-show="showUserDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style="display: none;">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center space-y-4">
+            <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+                <i class="fa-solid fa-user-xmark"></i>
+            </div>
+            <h3 class="font-bold text-lg text-slate-800">ยืนยันการลบผู้ใช้งาน</h3>
+            <p class="text-sm text-gray-600">คุณแน่ใจหรือไม่ว่าต้องการลบผู้ใช้งาน <strong class="text-slate-800" x-text="userToDelete"></strong>?</p>
+            <div class="flex justify-center space-x-3 pt-2">
+                <button @click="showUserDeleteModal = false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">ยกเลิก</button>
+                <button @click="deleteUser()" class="px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-700 transition">ยืนยันการลบ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmation Popup for Clear Log -->
+    <div x-show="showClearLogModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style="display: none;">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center space-y-4">
+            <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+                <i class="fa-solid fa-trash-can"></i>
+            </div>
+            <h3 class="font-bold text-lg text-slate-800">ยืนยันการล้างประวัติ Log</h3>
+            <p class="text-sm text-gray-600">คุณแน่ใจหรือไม่ว่าต้องการล้างประวัติการทำงานทั้งหมดจำนวน <strong class="text-rose-600" x-text="auditLogs.length"></strong> รายการ? การกระทำนี้ไม่สามารถย้อนกลับได้</p>
+            <div class="flex justify-center space-x-3 pt-2">
+                <button @click="showClearLogModal = false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">ยกเลิก</button>
+                <button @click="clearLogs()" class="px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-700 transition">ยืนยันการล้าง Log</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmation Popup for Import CSV -->
+    <div x-show="showImportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style="display: none;">
+        <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 space-y-4">
+            <div class="flex items-center space-x-3 text-emerald-600">
+                <div class="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-file-arrow-up"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-lg text-slate-800">ยืนยันการนำเข้าข้อมูล CSV</h3>
+                    <p class="text-xs text-gray-500">ตรวจสอบรายละเอียดก่อนบันทึกลงระบบ</p>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">ข้อมูลพร้อมนำเข้า:</span>
+                    <strong class="text-emerald-600" x-text="importPreviewData.newRows.length + ' รายการ'"></strong>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">รายการที่ถูกข้าม (Serial No ซ้ำ):</span>
+                    <strong class="text-rose-600" x-text="importPreviewData.duplicateSerials.length + ' รายการ'"></strong>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-2">
+                <button @click="showImportModal = false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">ยกเลิก</button>
+                <button @click="executeImportCSV()" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">ยืนยันการ Import</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Success Result Popup -->
+    <div x-show="showImportResultModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style="display: none;">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center space-y-4">
+            <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <h3 class="font-bold text-lg text-slate-800">นำเข้าข้อมูลสำเร็จ</h3>
+            <p class="text-sm text-gray-600">บันทึกข้อมูลเรียบร้อยแล้ว <br>จำนวน: <strong class="text-emerald-600" x-text="importSuccessCount + ' รายการ'"></strong></p>
+            <div class="flex justify-center space-x-3 pt-2">
+                <button @click="showImportResultModal = false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">ปิด</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Error Result Popup -->
+    <div x-show="showImportErrorModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style="display: none;">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center space-y-4">
+            <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="font-bold text-lg text-slate-800">ไม่สามารถนำเข้าข้อมูลได้</h3>
+            <p class="text-sm text-gray-600">ไม่มีข้อมูลใหม่ถูกนำเข้า เนื่องจาก Serial No ซ้ำทั้งหมด</p>
+            <div class="flex justify-center pt-2">
+                <button @click="showImportErrorModal = false" class="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">ปิด</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase Configuration -->
+    <script>
+        // TODO: แทนที่ค่าด้านล่างด้วยค่า config จากโปรเจกต์ Firebase ของคุณเอง
+        // (Firebase Console > Project settings > General > Your apps > SDK setup and configuration)
+        // และอย่าลืมสร้าง Realtime Database ในโปรเจกต์ (Build > Realtime Database > Create Database)
+        const firebaseConfig = {
+            apiKey: "AIzaSyAilRbfIPuec0CqTL35thvCTGpIc1kG_sw",
+            authDomain: "it-asset-1db5d.firebaseapp.com",
+            databaseURL: "https://it-asset-1db5d-default-rtdb.firebaseio.com",
+            projectId: "it-asset-1db5d",
+            storageBucket: "it-asset-1db5d.firebasestorage.app",
+            messagingSenderId: "943344315255",
+            appId: "1:943344315255:web:551d4ff9392ba1957bcf72"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+    </script>
+
+    <!-- Script Application Logic -->
+    <script>
+        function assetApp() {
+            return {
+                isLoggedIn: false,
+                currentUser: '',
+                loginForm: { username: '', password: '' },
+                loginError: '',
+
+                warehouseOptions: [
+                    '11109-อุดรธานี',
+                    '11124-อุบลราชธานี',
+                    '11166-มหาสารคาม',
+                    '11167-ศรีสะเกษ',
+                    '11169-อำนาจเจริญ',
+                    '11213-มุกดาหาร',
+                    '11217-กาฬสินธุ์',
+                    '11231-หนองคาย',
+                    '11233-โคราช 2'
+                ],
+
+                transferUseOptions: [
+                   "11101-วงศ์สว่าง",
+"11102-แจ้งวัฒนะ",
+"11104-พัทยา",
+"11106-บางพลี",
+"11107-นครปฐม",
+"11108-ที่ 3",
+"11109-อุดรธานี",
+"11110-ขอนแก่น",
+"11111-ที่ 8",
+"11112-สุราษฎร์ธานี",
+"11113-พิษณุโลก",
+"11115-ระยอง",
+"11116-ธนบุรี-ปากท่อ",
+"11117-เชียงราย",
+"11118-ลำปาง",
+"11119-ลพบุรี",
+"11120-เพชรบุรี",
+"11121-หาดใหญ่",
+"11122-หัวหมาก",
+"11123-สมุทรปราการ",
+"11124-อุบลราชธานี",
+"11125-ดอนเมือง",
+"11126-แฟชั่นไอซ์แลนด์",
+"11127-เชียงใหม่",
+"11128-สุขสวัสดิ์",
+"11129-ภูเก็ต",
+"11130-บางนา",
+"11131-ลาดพร้าว",
+"11132-ดาวคะนอง",
+"11133-ติวานนท์",
+"11134-พัทยา 2",
+"11135-นครสวรรค์",
+"11136-สะพานควาย",
+"11137-ฉะเชิงเทรา",
+"11138-สำโรง",
+"11139-ปัตตานี",
+"11140-สุรินทร์",
+"11141-อ้อมใหญ่",
+"11142-เพชรเกษม",
+"11143-สุขาภิบาล3",
+"11144-เอกมัย",
+"11145-สกลนคร",
+"11146-แพร่",
+"11147-ราชบุรี",
+"11148-ลำลูกกา",
+"11150-ลำพูน",
+"11151-สมุย",
+"11152-ชลบุรี",
+"11153-บุรีรัมย์",
+"11154-หางดง",
+"11155-อยุธยา",
+"11156-สุโขทัย",
+"11157-บ้านโป่ง",
+"11158-ชัยภูมิ",
+"11159-เพชรบูรณ์",
+"11160-กระบี่",
+"11161-นวนคร",
+"11162-รังสิตคลองหก",
+"11163-ยโสธร",
+"11164-สระแก้ว",
+"11165-วารินชำราบ",
+"11166-มหาสารคาม",
+"11167-ศรีสะเกษ",
+"11168-มหาชัย",
+"11169-อำนาจเจริญ",
+"11170-แหลมทอง",
+"11171-กำแพงเพชร",
+"11172-ราชดำริ",
+"11174-ลาดพร้าว2",
+"11175-ชลบุรี 3 เซ็นทรัล",
+"11176-ลพบุรี 2",
+"11179-เพชรเกษม2",
+"11180-รามอินทรา",
+"11181-ชลบุรี 2",
+"11182-อ่อนนุช",
+"11183-บางใหญ่",
+"11184-เชียงใหม่ 2",
+"11185-แจ้งวัฒนะ 2",
+"11186-หาดใหญ่ 2",
+"11187-ภูเก็ต 2",
+"11188-หางดง 2",
+"11189-รัตนาธิเบศร์ 2",
+"11190-พระราม 4",
+"11191-รัชดาภิเษก",
+"11192-พัทยา 3",
+"11193-ลำลูกกา คลอง4 2",
+"11195-บางบอน",
+"11196-บางปะกอก",
+"11197-พระราม 22",
+"11198-รังสิต คลอง 3",
+"11199-อิสรภาพ",
+"11200-สุวินทวงศ์",
+"11201-หนองจอก",
+"11202-ร่มเกล้า",
+"11204-ฉะเชิงเทรา 2",
+"11205-อุดรธานี 2",
+"11206-ชุมพร",
+"11207-ตาก",
+"11208-บ้านบึง",
+"11209-จันทบุรี",
+"11210-เมกาบางนา",
+"11211-เลย",
+"11212-สตูล",
+"11213-มุกดาหาร",
+"11214-นครสวรรค์2",
+"11215-ร้อยเอ็ด",
+"11216-อ่างทอง",
+"11217-กาฬสินธุ์",
+"11218-สมุทรสงคราม",
+"11219-สุพรรณบุรี",
+"11220-ตรัง",
+"11221-กัลปพฤกษ์",
+"11222-ศรีมหาโพธิ",
+"11223-นครพนม",
+"11224-กาญจนบุรี",
+"11225-น่าน",
+"11226-กระนวน",
+"11227-ระนอง",
+"11228-โพนพิสัย",
+"11229-นาทวี",
+"11230-บ้านไผ่",
+"11231-หนองคาย",
+"11232-อรัญประเทศ",
+"11233-โคราช 2",
+"11234-ปทุมธานี",
+"11235-บ้านดุง",
+"11236-น้ำยืน",
+"11237-วังน้ำเย็น",
+"11238-ท่าตะโก",
+"11239-ด่านขุนทด",
+"11240-สุวรรณภูมิ ร้อยเอ็ด",
+"11241-วิเชียรบุรี",
+"11242-คำตากล้า",
+"11243-พังโคน",
+"11244-สัตหีบ",
+"11246-หนองบัว",
+"11247-หนองกี่",
+"11248-ลาดยาว",
+"11249-นครศรีธรรมราช",
+"11250-เชียงราย 2",
+"11251-ขอนแก่น 2",
+"11252-ไทรน้อย",
+"11253-ปากช่อง",
+"11254-มหาชัย 2",
+"11255-บ่อวิน",
+"11256-นราธิวาส",
+"11257-สุไหงโก-ลก นราธิวาส",
+"11258-ไฮเปอร์ สระบุรี",
+"11259-ยะลา",
+"11260-หัวหิน มาร์เช่",
+"11261-ฟีนิกซ์",
+"14001-JUMBO สำโรง",
+"14002-คลังบางนา กม. 23",
+"14003-DEPOT ประโคนชัย",
+"14004-DEPOT ตาคลี",
+"14005-DEPOT กุฉินารายณ์",
+"14006-DEPOT ประทาย",
+"14007-DEPOT ปักธงชัย",
+"14008-DEPOT บ้านตาขุน",
+"14009-DEPOT ตระการพืชผล",
+"14010-DEPOT ตะพานหิน",
+"14011-DEPOT ปราสาท",
+"14012-DEPOT บำเหน็จณรงค์",
+"14013-DEPOT สมเด็จ",
+"14014-DEPOT โชคชัย 4",
+"14015-DEPOT ปาล์ม ไอส์แลนด์",
+"15002-พังงา",
+"15003-BMK สายไหม",
+"15004-BMK สุขาภิบาล 5",
+"15006-BMK สวนหลวง",
+"15007-BMK ประชาอุทิศ",
+"15008-BMK เคหะร่มเกล้า",
+"15009-BMK หทัยราษฎร์",
+"15010-หล่มสัก",
+"15011-เทพกษัตรีย์",
+"15013-กมลา",
+"15014-พิบูลมังสาหาร",
+"15015-BMK ปลวกแดง",
+"15016-BMK ท่าเรือ",
+"15017-BMK คู้บอน",
+"15018-BMK บ้านเพ",
+"15019-BMK ชะอำ",
+"15020-BMK หัวหิน",
+"15022-BMK เกาะพะงัน",
+"15023-BMK เชียงคาน",
+"15026-BMK สิชล",
+"15027-BMK ราษีไศล",
+"15029-BMK ระโนด",
+"15030-BMK สวรรคโลก",
+"15033-BMK เสลภูมิ",
+"15034-BMK ตะกั่วป่า",
+"15035-BMK บางมูลนาก",
+"15038-BMK สีคิ้ว",
+"15040-BMK วิเศษชัยชาญ",
+"15041-BMK น้ำโสม",
+"15044-BMK โนนสูง",
+"15045-BMK ภูเวียง",
+"15046-BMK โซ่พิสัย",
+"15047-BMK หนองม่วง",
+"15048-BMK ชุมพวง",
+"15050-BMK พุทธมณฑลสาย 5",
+"15051-BMK ห้วยแถลง",
+"15053-BMK พันท้ายนรสิงห์",
+"15054-BMK เกาะช้าง",
+"15055-BMK วัดลาดปลาดุก",
+"15058-BMK วังสะพุง",
+"15059-BMK พันธุ์ทิพย์ เชียงใหม่",
+"15061-BMK เกตเวย์ บางโพบางซื่อ",
+"15062-BMK สามย่านมิตรทาวน์",
+"15063-BMK ท่าอิฐ",
+"15064-BMK หนามแดง",
+"15066-พันธุ์ทิพย์ งามวงศ์วาน",
+"15067-เอเชียทีค",
+"15068-วัน แบงค็อก",
+"15069-ดิ โอลด์ สยาม",
+"15070-มหาทุน",
+"15071-เดอะแจส รามอินทรา",
+"15072-สวนนงนุช",
+"15073-ปาร์ค บางนา",
+"15074-ตลาดบุญเจริญ",
+"15075-BMK เอกชัย",
+"17001-สำนักงานใหญ่",
+"17002-MMFS ปาล์ม ไอส์แลนด์",
+"17003-MMFS โชคชัย 4",
+"17004-MMFS ตลาดบุญเจริญ",
+"17005-MMFS เอกชัย",
+"17006-สาขาบางนา",
+"17007-สนามบินน้ำ",
+"17008-สาขาพัทยา 2",
+"21002-LP อุดมสุข",
+"21005-MBC ชินเขต",
+"21007-MBC บางพลี",
+"21008-MBC แฉล้มนิมิตร",
+"21009-MBC พัฒนาการ 20",
+"21010-MBC พระปิ่น3",
+"21011-MBC ลาซาล 24",
+"21012-MBC ท่าอิฐ",
+"21013-MBC รังสิตคลอง2",
+"21014-MBC หมู่บ้านสหกรณ์",
+"21015-MBC ศาลายา",
+"21016-MBC ดอนหวาย",
+"21017-MBC ตลาดกรุงธน",
+"21018-MBC ประชาชื่น12",
+"21019-MBC ทิพย์พิมาน",
+"21020-MBC เฉลิมพระเกียรติ",
+"21022-MBC เสรีไทย 41",
+"21027-MBC นิมิตรใหม่",
+"21029-MBC สุขาภิบาล2",
+"21030-MBC ซอยหนองใหญ่",
+"21031-MBC ตลาดสุชาติ",
+"21032-MBC ซอยเปียร์นนท์",
+"21033-MBC รัตนโกสินทร์",
+"21035-MBC หลวงแพ่ง 5",
+"21037-MBC หลวงแพ่ง 1",
+"21039-MBC เพชรอารี",
+"21043-MBC ตลาดออเงิน",
+"21044-MBC ซอยพึ่งมี 17",
+"21045-MBC อ่อนนุช 17",
+"21046-MBC คลองพยอม",
+"21047-MBC ซอยแบริ่ง 34",
+"21048-MBC ซอยศรีสมิตร",
+"21049-MBC เอื้อฯ ลาดกระบัง2",
+"21051-MBC วัดนาวง",
+"21053-MBC แหลมฟ้าผ่า",
+"21055-MBC โรงไฟฟ้าบางปะกง",
+"21056-MBC เอื้ออาทรคลอง 1",
+"21057-MBC วัชรพล",
+"21058-MBC หมู่บ้านซื่อตรง",
+"21059-MBC เอื้ออาทรบางเขน",
+"21061-MBC ดอนขุนวัง",
+"21062-MBC นิคมนวนคร",
+"21063-ตลาดลองมาซิเออ, สมุทรปราการ",
+"21064-MBC โรงพยาบาลเปาโล",
+"21065-MBC เคหะธานี 4",
+"21067-MBC ตลาดนำไทย",
+"21068-MBC เคหะรามอินทรา",
+"21069-MBC เพชรสยาม3",
+"21071-MBC วังหิน",
+"21072-MBC สุคนธสวัสดิ์",
+"21073-MBC BCP สุขาภิฯ12",
+"21074-MBC BCP เจริญกรุงฯ",
+"21075-MBC วัดวังหิน",
+"21077-MBC พหลโยธิน52",
+"21078-MBC BCP พัฒนาการ",
+"21079-MBC BCPพระราม33",
+"21080-MBC หมู่บ้านมณีแก้ว",
+"21081-MBC เกษตรรวมใจ",
+"21083-MBC นิคมบางปู",
+"21085-MBC ลาดพร้าว107",
+"21086-แฟมิลี่แลนด์",
+"21087-MBC บางกระดี่",
+"21088-MBC เสือใหญ่อุทิศ",
+"21089-MBC ตลาดพิมลราช",
+"21090-MBC โชคชัย4 ซอย31",
+"21091-บางทราย",
+"21092-เอื้อฯรามอินทรา",
+"21093-แยกมาบโป่ง",
+"21094-หมู่บ้านศรีเพชร",
+"21095-หมู่บ้านพระปิ่น5",
+"21096-ตลาดสี่ขวา",
+"21100-พหลโยธิน 54",
+"21101-MBC ตลาดวังน้อย",
+"21103-MBC สยามคันทรีคลับ",
+"21104-ลาดพร้าว 80",
+"21105-ประชาอุทิศ 90",
+"21108-เอื้ออาทรสุวรรณภูมิ",
+"21110-เก้ากิโล",
+"21112-BCP ประดิษฐ์ฯ",
+"21113-แฟมิลี่ทาวน์",
+"21114-เอื้อฯเศรษฐกิจ3",
+"21115-ตลาดพงษ์เอี่ยม",
+"21116-ตลาดศิริพนม",
+"21117-อ่างศิลา",
+"21118-ตลาดใหม่นาเกลือ",
+"21119-ซอยโพธิ์แก้ว",
+"21123-หทัยราษฎร์ 25",
+"21124-เฉลิมฯ 65",
+"21126-เพชรบ้านสวน",
+"21127-คานหาม",
+"21128-เสนา",
+"21129-เดอะทรี",
+"21130-ศรีมหาโพธิ",
+"21131-วิภาวดี 64",
+"21133-ซอยอุดมเดช",
+"21135-ตลาดแพนเวย์",
+"21136-ตลาดเกษตรพัฒนา",
+"21137-บ้านฟ้ารังสิต",
+"21139-พุทธสาคร",
+"21140-BCP บรมฯ กม.15",
+"21141-แยกนิคมเกตเวย์",
+"21142-อินทราวาส",
+"21143-เคหะสระบุรี",
+"21144-ตลาดอุดมสุข",
+"21145-ตลาดโรงสี",
+"21147-BCP บางละมุง",
+"21149-ตลาดคุณตาพลอย",
+"21150-วัดไทรม้า",
+"21151-MBC ถนนชัยพรวิถี",
+"21155-ตลาดจอมพล",
+"21156-ตลาดโคกกระถิน",
+"21157-ฉลองกรุง 53",
+"21158-ตลาดลานทราย",
+"21160-วัดบัวโรย",
+"21162-ตลาดคลอง 16",
+"21163-นาพร้าว",
+"21167-BCP พัฒนาการ 27",
+"21170-ชุมชนบ้านอ้อย",
+"21171-บ้านอำเภอ",
+"21173-ม.ภูมิใจนิเวศน์",
+"21174-BCP เทพารักษ์ กม9",
+"21179-สามแยกเจดีย์",
+"21180-ม.วิเศษสุขนคร",
+"21181-BCP เอเชีย กม62",
+"21182-ถนนท้ายบ้าน",
+"21183-ถนนปราจีนตคาม",
+"21184-ตลาดกบินทร์บุรี",
+"21185-ตลาดตำหรุ",
+"21186-BCPบางบัวทองบางพูน",
+"21194-BCP เพชรพระราม",
+"21196-ตลาดหมอนนาง",
+"21198-BCP พระราม2 กม52",
+"21199-BCP เอเชีย กม69",
+"21201-ตลาดหัวรอ",
+"21202-ซอยบงกช",
+"21204-เทียนทะเล 28",
+"21205-บางเลน",
+"21206-สะพานสี่",
+"21207-นาจอมเทียน",
+"21208-บางปูนคร",
+"21210-ศรีประจันต์",
+"21211-เสาไห้",
+"21212-หนองม่วง",
+"21213-สามกระบือเผือก",
+"21219-เคหะแหลมฉบัง",
+"21220-BCP พหลฯ กม.106",
+"21221-นาจอมเทียน 13",
+"21222-BCP อิสรภาพ",
+"21223-สน.โคกคราม",
+"21224-นิคมลาดกระบัง",
+"21225-ตลาดวัดม่วง",
+"21226-รังสิตคลอง 6",
+"21227-สวนผัก ซอย 1",
+"21228-เทศบาลบางปู 59",
+"21230-แสวงหา",
+"21233-BCPเอเชีย กม 150",
+"21234-เอื้ออาทรมีนบุรี",
+"21236-เอื้อฯ หนองแขม",
+"21237-BCP พัทยาเหนือ",
+"21242-บางแสนอ่างศิลา",
+"21243-เขาขยาย",
+"21244-BCPพระราม2 กม20",
+"21247-BCP อ้อมใหญ่",
+"21250-BCP อุดมสุข 45",
+"21252-วัดบางเกลือ",
+"21253-เคหะรามคำแหง",
+"21254-รามคำแหง 53",
+"21256-หนองเกตุใหญ่",
+"21257-ตำบลลำโพ",
+"21258-BCP วังตะเคียน",
+"21260-BCP พระราม 2 กม.33",
+"21263-วัดสิงห์",
+"21265-ซอยอัลลายน์",
+"21266-สรรพยา",
+"21267-บ่อทอง-ชลบุรี",
+"21269-ซอยจตุรมิตร",
+"21270-ศาลาลำดวน",
+"21272-ตลาดสัตหีบ",
+"21273-ตลาดสระแก้ว",
+"21274-BCP วิภาฯ กม.12",
+"21275-BCP วิภาฯ กม.17",
+"21277-BCP เทศฯบางปู77",
+"21278-BCP จรัลฯ 95/2",
+"21279-BCP พัทยากลาง",
+"21280-อู่ทอง",
+"21284-เอื้ออาทรท่าจีน",
+"21285-เอื้อฯขจรวิทย์",
+"21286-ทัพทัน",
+"21287-คลองมะเดื่อ 12",
+"21289-เอื้อสมุทรปราการ",
+"21290-สินสาคร",
+"21295-สี่แยกทศกัณฑ์",
+"21297-ตลาดโรงเกลือ",
+"21300-BCPพระราม2 กม78",
+"21303-เพชรเกษม 77",
+"21304-หนองไผ่แก้ว",
+"21305-ถนนสุขประยูร",
+"21307-วัดพระญาติ",
+"21312-วัดโพธิ์ทอง",
+"21313-ตลาดท่าข้าม",
+"21314-MBCเอื้อบางขุนเทียน",
+"21315-โคกตูม",
+"21317-คูขวาง 6",
+"21318-ไทยคันทรีคลับ",
+"21323-BCP พหลโยธิน 59",
+"21324-BCP สุวินทวงศ์",
+"21325-BCPปากช่อง-ชำนาญ",
+"21330-BCP บายพาสชลบุรี กม.1",
+"21331-BCP โรจนะ",
+"21332-BCP อ่อนนุช 17/1",
+"21333-BCP ราชพฤกษ์",
+"21336-BCP สายเอเชีย กม 81ขาออก",
+"21339-BCP ท่าฉาง-สุราษฎร์ธานี",
+"21340-BCP ท่าศาลา",
+"21343-BCP ไชโย",
+"21344-BCPบ้านโพธิ์-เมืองนครราชสีมา",
+"21345-BCP โตนด-โนนสูง",
+"21349-BCP ปากช่อง-น้ำค้าง",
+"21352-BCP พระพุทธบาท",
+"21353-BCP ลำลูกกา",
+"21356-BCP สนามบิน-สุราษฎร์ธานี",
+"21362-BCP คลองสวนพลู",
+"21364-BCP เมืองมหาสารคาม",
+"21369-BCP คีรีมาศ",
+"21376-BCP พระราม2 กม.59ขาเข้า",
+"21378-BCP หนองแสง-นครพนม",
+"21379-BCP สุขาภิบาล 3",
+"21381-BCP ท่าชนะ-สุราษฎร์ธานี",
+"21383-BCP ปราสาท",
+"21390-BCP สันโป่ง-แม่ริม",
+"21391-BCP พล",
+"21393-BCP ทุ่งตะโก 2",
+"21399-BCP เปลี่ยน-สิชล",
+"21401-BCP ศรีนครินทร์-สมิติเวช",
+"21403-BCP หมูม่น-เมืองอุดรธานี",
+"21404-BCP สตรีวิทยา 2",
+"21406-BCP ประตูน้ำพระอินทร์ขาออก",
+"21408-BCP โนนสูง-เมืองอุดรธานี",
+"21409-พระประแดง",
+"21410-หมู่บ้านดีเค",
+"21411-TCC กาแล ไนท์บาซาร์",
+"21413-CTX รามอินทรา ซอย 40",
+"21414-CTX พัทยากลาง",
+"21415-TCC สุริวงศ์บุ๊คเซ็นเตอร์",
+"21417-MBC หัวกุญแจ บ้านบึง",
+"21418-MBC CTX ฟ้าฮ่าม เชียงใหม่",
+"21419-MBC ตลาดศรีย่าน",
+"21420-MBC ตลาดวังน้ำเย็น",
+"21423-MBC ตลาดมีนบุรี",
+"21424-CTX แม่ริม",
+"21425-MBC หนองแค สระบุรี",
+"21426-MBC เกาะโพธิ์ ชลบุรี",
+"21429-MBC TCC ตะวันนา 2",
+"21430-MBC TCC อาคารพลับพลาไชย",
+"21431-MBC TCC ตะวันนา 1",
+"21433-MBC CTX โรจนะ 2",
+"21434-MBC TCC น่ำเฮง",
+"21435-MBC ซอยประชุม ถนนสุรวงศ์",
+"21436-MBC โรงพยาบาลกรุงเทพ พิษณุโลก",
+"21438-MBC เคหะหนองหอย",
+"21439-MBC หมู่บ้านหรรษา",
+"21440-MBC ตลาดบ้านกาด แม่วาง",
+"21441-MBC บ้านกร่าง พิษณุโลก",
+"21442-MBC ตลาดประตูก่อม",
+"21443-MBC พญาเสือ",
+"21446-MBC ตลาดหนองบอนแดง",
+"21447-MBC สัตหีบพลาซ่า",
+"21450-MBC โรงพยาบาลรวมแพทย์",
+"21451-MBC เอสโซ่องครักษ์",
+"21452-MBC ตลาดพุนพิน",
+"21453-MBC โรงพยาบาล ลำพูน",
+"21455-MBC ตลาดต้นพยอม 2",
+"21456-MBC หนองสาหร่าย",
+"21457-วิทยาลัยสารพัดช่างนครราชสีมา",
+"21458-MBC ศิริพลาซ่า",
+"21459-MBC ตลาดบ้านห้วย",
+"21460-MBC ซอยจินตคาม",
+"21461-MBC เอกาทศรฐ",
+"21462-MBC พุมเรียง",
+"21463-MBC พันธุ์ทิพย์บางกะปิ",
+"21465-MBC สถานีตำรวจอุดร",
+"21467-MBC เอื้ออาทร กระทุ่มแบน 2",
+"21468-MBC ราชภัฏสุราษฎร์ธานี",
+"21471-MBC นเรศวร 2",
+"21473-MBC หมู่บ้านพรธิสาร4",
+"21474-MBC ชุมชุน จุกกะเฌอ",
+"21475-MBC หมู่บ้านภัทรนิเวศน์",
+"21477-MBC ประชาอุทิศ อุดรธานี",
+"21479-MBC ตลาดเดอะฟิวชั่นเอส",
+"21480-MBC แปซิฟิก พลาซ่า",
+"21481-MBC ตลาดสระแก้ว",
+"21482-MBC เตาถ่าน",
+"21483-MBC มาบมะยม",
+"21484-MBC โป่งสะเก็ด",
+"21485-MBC มาบยางพร",
+"21486-MBC กุสุมาลย์",
+"21487-MBC บ้านคลอง",
+"21489-MBC สวนภูมิรักษ์",
+"21490-MBC ตลาดใหม่ไทยเกษม",
+"21491-MBC หมู่บ้านเซนสิริ แหลมฉบัง",
+"21492-MBC ท่าอุเทน",
+"21493-MBC บ้านโนนทัน",
+"21495-MBC อภิบาลบัญชา",
+"21496-MBC ไร่กล้วย2 ศรีราชา",
+"21497-MBC ตลาดท่าทองใหม่",
+"21498-MBC บ้านค่าย",
+"21499-MBC นิคมอุตสาหกรรมสุรนารี",
+"21500-MBC นาเกลือ-บางละมุง",
+"21501-MBC แปลงยาว",
+"21502-MBC ชุมชนหนองหว้า ซอย5",
+"21503-MBC ถนนโพธิ์ทอง",
+"21505-MBC ประชารักษา",
+"21506-MBC บางบ่อ",
+"21507-MBC มิ้ตติ้งมอลล์จรัญสนิทวงศ์",
+"21508-MBC ซอยเสือใหญ่ 2",
+"21509-หน้าค่ายวิภาวดีรังสิตสุราษฎร์ฯ",
+"21510-MBC บ้านณรงค์ชัย",
+"21511-MBC หมู่บ้านการเคหะนครราชสีมา",
+"21513-MBC ปากกราน",
+"21514-MBC เคหะมาบตาพุด",
+"21515-MBC ทุ่งสุขลา",
+"21516-MBC ปากน้ำ ระยอง",
+"21518-MBC กาญจนาภิเษก 39",
+"21519-MBC หมู่บ้านเปรมประชา",
+"21520-MBC มาบยางพร 22",
+"21521-MBC ถนนโฉลกรัฐ",
+"21522-MBC ตลาดโรงสี นาป่า",
+"21523-MBC ตลาดสดทุ่งเสา หาดใหญ่",
+"21524-MBC หมู่บ้านการการุณรังษี",
+"21525-MBCหนองปลาหมอ",
+"21526-MBC วัดไร่ขิง",
+"21528-MBC ซอยอุตสาหกรรม สุรนารี",
+"21529-MBC เคหะเอื้ออาทร ศิลา",
+"21531-MBC ถนนบันเทิง",
+"21532-MBC หมู่บ้านไม้หอม",
+"21533-MBC หมู่บ้านเดอะแกรน",
+"21534-MBC ถนนรัตนอุทิศ หาดใหญ่",
+"21535-MBC ท่าขอนยาง",
+"21536-MBC ตลาดใหม่มุมเมือง",
+"21537-MBC สบตุ๋ย",
+"21539-MBC สีหราชเดโชชัย",
+"21540-MBC บ้านเก่า ซอย5",
+"21541-MBC ถนนเทศาพัฒนา",
+"21543-MBC ทิวลิป สแควร์",
+"21544-MBC สุขประยูร นาป่า",
+"21545-MBCหมู่บ้านสินทวีพระราม2ซอย43",
+"21546-MBC แยกวังตาผิน",
+"21547-MBC โคกกรวด",
+"21548-MBC ถนนถีนานนท์",
+"21549-MBC หมู่บ้านลากูน่าโฮม",
+"21550-MBC ตลาดชัชวาล คลอง7",
+"21552-MBC หลิ่งมื่น เชียงใหม่",
+"21553-MBC บ้านเป็ด",
+"21554-MBC ซอยทุ่งเจริญ 1",
+"21555-MBC คลองหลวง ซอย 19",
+"21556-MBC ถนนทะเลหลวง ซอย 16",
+"21557-MBC ตลาดรัษฏา",
+"21559-MBC ซอยบุญคุ้ม",
+"21560-MBC บุญศิริ",
+"21561-MBC เอกชัย 46",
+"21562-MBC โพธิสาร",
+"21563-MBC สันกำแพง",
+"21565-MBC ไทยธานี ซอย 39",
+"21566-MBC ถนนรามอินทรา 39",
+"21567-MBC เคหะรัษฏาภูเก็ต",
+"21568-MBC ไนท์บาร์ซ่าร์สวนหมาก",
+"21570-MBC เรวดี 43",
+"21571-MBC ตลาดบ้านจำเริญ",
+"21572-MBC เดอะมิกซ์ มาบยางพร",
+"21573-MBC ตลาดรถไฟ อยุธยา",
+"21574-MBC เอื้ออาทร บ้านเป็ด",
+"21575-MBC มาบยางพร 43",
+"21576-MBC ป่าแดด",
+"21577-MBC ถนนดอนนก",
+"21578-MBC พระพุทธบาท",
+"21579-MBC ถนนนครสวรรค์",
+"21580-MBC ตลาดสดกระทู้",
+"21581-MBC ซอยคลองบางวัด",
+"21582-MBC ชลพฤกษ์",
+"21583-MBC ชุมชนศรีษะละเลิง",
+"21584-MBC หนองกระทุ่ม",
+"21585-MBC บางทราย 2",
+"21586-MBC ถนนเจริญเมือง",
+"21587-MBCหมู้บ้านโฮมการ์เด้นวิลล์2",
+"21588-MBCถนนคลองเรียน2 ซอย2หาดใหญ่",
+"21589-MBC  สินธิวาธานี 2",
+"21590-MBC เจริญสินธานี",
+"21591-MBC ถนนศรีนวล",
+"21592-MBC เพิ่มสิน ซอย 20",
+"21593-หน้ามหาวิทยาลัยศิลปกรนครปฐม",
+"21594-MBC ซอยวัดโพธิ์ 24",
+"21595-MBC หนองข่า",
+"21596-MBC ตลาดไทยศิริ",
+"21597-MBC บางพระ",
+"21598-MBC แก่งขนุน",
+"21599-MBC โนนม่วง",
+"21600-MBC เทียนทะเล 20",
+"21601-MBC หมู่บ้านหรรษา อุดรธานี",
+"21602-MBC เคหะชุมชนสุราษฎร์ธานี",
+"21603-MBC ซอยมหาชัย",
+"21604-MBC เอื้ออาทร บางโฉลง",
+"21605-MBC หน้าโรงพยาบาลมหาราช",
+"21606-MBC ถนนเทวัญ",
+"21607-หลังมหาวิทยาลัยสงขลานครินทร์",
+"21608-MBC ถนนกาญจนวนิช ซอย 37",
+"21609-MBC ซอยวัดท่าไม้",
+"21610-MBC เดอะโฟริเอช",
+"21611-MBC บ้านสุรศักดิ์",
+"21612-MBC ถนนคลองเตยพัฒนา1 หาดใหญ่",
+"21613-MBC ราชดำริ",
+"21614-MBC ลาดพร้าว 64",
+"21615-MBC ตลาดหน้าศูนย์พัฒนา",
+"21616-MBC ประชาสันติ",
+"21617-MBC ชุมชนหลักร้อย",
+"21619-MBC ซอยห้วยตาเทศ",
+"21620-MBC บางแสน สาย 4 เหนือ",
+"21621-MBC ประตูน้ำพระอินทร์",
+"21623-MBC ตลาดไนท์ พิมาย",
+"21624-MBC ถนนชลประทาน เชียงใหม่",
+"21625-MBC ถนนเวียงบัว",
+"21626-MBC ถนนพระพุทธศรีไชยโย",
+"21627-MBC ชุมชนบ่อนไก่",
+"21628-MBC พิมานธานี",
+"21629-MBC ถนนหลังเมือง",
+"21631-MBC บ้านอุ่นไอรัก",
+"21632-MBC โรงพยาบาลปลวกแดง",
+"21633-MBC ห้าแยก กกโพธิ์",
+"21634-MBC ถนนราชการดำเนิน",
+"21635-MBC เทศบาลตำบลเวียงสระ",
+"21637-MBC เคหะนาจอมเทียน",
+"21638-MBC ถนนรมย์บุรี",
+"21639-MBC สุขสวัสดิ์ 78",
+"21640-MBC ชุมชนนาควิชัย",
+"21641-MBC บ้านร็อคการ์เด้น",
+"21642-MBC สุขสวัสดิ์ 84 ซอยคู่สร้าง",
+"21643-MBC ซอยชมจันทร์",
+"21644-MBC ตลาดลอนดอน บางโทรัด",
+"21645-MBC ถนนไชยานุภาพ",
+"21646-MBC ตลาดท่ารั้ว",
+"21647-MBC บ้านโป่ง",
+"21648-MBC ตึกน้ำ",
+"21649-MBC ซอยเจ้าฟ้า 14",
+"21650-MBC เขาไม้แก้ว",
+"21651-MBC หมู่บ้านเมืองประชา",
+"21652-MBC ถนนปลายบาง",
+"21653-MBC ถนนพัฒนาการคูขวาง 30",
+"21654-MBC บ้านชุมเห็ด",
+"21656-MBC ถนนโชตนา",
+"21657-MBC คู้บอน ซอย 27",
+"21658-MBC ถนนรัถการ หาดใหญ่",
+"21659-MBC เมืองทองธานี 2",
+"21661-MBC ตลาดเจริญทรัพย์",
+"21662-MBC ถนนปฏัก ฉลอง",
+"21663-MBC วังสามหมอ",
+"21664-MBC ชุมชนพาณิชเจริญ",
+"21665-MBC ตลาดเจริญ เจริญ",
+"21666-MBC ถนนเจ้าฟ้า ตะวันตก",
+"21667-MBC หนองวัวซอ",
+"21668-MBC มาบยางพร-วังตาผิน",
+"21669-MBC อำเภอจะนะ",
+"21670-MBC ถนนสุขาประชาสรรค์ 3",
+"21671-MBC น้ำพองนอก",
+"21672-MBC ดอนหัวฬ่อ",
+"21673-MBC ชุมชมวัดศรีวนราม",
+"21674-MBC มวกเหล็ก",
+"21675-MBC ถนนประชาราษฎร์",
+"21676-MBC ถนนพลพิชัย หาดใหญ่",
+"21677-MBC ถนนท่าคราวน้อย",
+"21678-MBC น้ำพองใน",
+"21679-MBC กิ่งแก้ว หนามแดง",
+"21680-MBC ตลาดสี่มุมเมือง แหลมฉบัง",
+"21681-MBC ตลาดราชมนตรี สาย 1",
+"21682-MFC ถนนมหาราช โคราช",
+"21684-MBC FC ปากช่อง 20",
+"21686-MBC ลาดกระบัง ซอย 14/1",
+"21687-MBC บ้านน้ำโท้ง",
+"21688-MBC ตลาดหนองปรือ",
+"21689-MBC เชลล์ สัตหีบ กม.10",
+"21690-MBC เอสโซ่ บางคล้า",
+"21692-MBC ตลาดเมืองใหม่",
+"21693-MBC ภิญญาช้อปปิ้งเซ็นเตอร์",
+"21694-MBC ตลาดโต้รุ่ง มหาสารคาม",
+"21695-MBC เทศบาลแหลมฉบัง",
+"21696-MBC เลียบคลอง สีวา พาสวัสดิ์",
+"21697-MBC อมตะ เฟส6 บ้านเก่า",
+"21698-MBC ตลาดเทศบาลอุดร",
+"21699-MBC หาดราไวย์",
+"21700-MBC บ้านพรุธานี",
+"21701-MBC ประชาสามัคคี",
+"21703-MFC แบริ่ง 48/3",
+"21704-หลังมหาวิทยาลัยสงขลานครินทร์2",
+"21705-MBC เอสโซ่ กาญจนดิษฐ์ขาออก",
+"21706-MBC เอสโซ่ หทัยราษฎร์",
+"21707-MBC เอสโซ่ หนองรี กม.6",
+"21708-MBC เอสโซ่ แสมดำ พระราม 2",
+"21709-MBC เอสโซ่ พลับพลาไชย",
+"21710-MBC คาลเท็กซ์ หนองก้างปลา",
+"21711-MBC เอสโซ่ เหมราช 2 บ่อวิน",
+"21712-หมู่บ้านวิรินทร์พรปลวกแดงระยอง",
+"21713-หน้าโรงงาน แอลจี, ระยอง",
+"21714-MBC เอสโซ่ วัดโบสถ์",
+"21715-MBC คาลเท็กซ์ สหพัฒน์",
+"21716-MBC คาลเท็กซ์ มาบเอียง",
+"21718-MBC เอสโซ่ เข้าท่า,ตราด",
+"21719-ตลาดจตุจักร ลำพูน",
+"21720-เอสโซ่NTI ท่าโรงช้างสุราษฎร์ฯ",
+"21721-MBC ตลาดหนองใหญ่,ขอนแก่น",
+"21722-เอสโซ่ศิลาลอย,ประจวบคีรีขันธ์",
+"21723-MBC หน้าค่ายเสนาณรงค์,หาดใหญ่",
+"21724-MBC ด่านนอก,สงขลา",
+"21726-เอสโซ่สหกรณ์สามร้อยยอด,ประจวบฯ",
+"21727-MBC เอสโซ่ตาลคู่,นครราชสีมา",
+"21729-เอสโซ่ นิคมอุตสาหกรรม,ลำพูน",
+"21730-คาลเท็กซ์ สินสาคร,สมุทรสาคร",
+"21731-ซอยหินหัวใจสมุย,สุราษฎร์ธานี",
+"21732-MBC เจริญสิน บ่อวิน,ชลบุรี",
+"21734-MBC เชลล์บ้านค่าย,ระยอง",
+"21736-เอสโซ่เดิมบางนางบวช,สุพรรณบุรี",
+"21737-เอสโซ่เพชรเกษม กม.271ขาเข้า",
+"21738-MBC มาบยางพร 23,ระยอง",
+"21739-MBC เอสโซ่ บางบัวทอง,นนทบุรี",
+"21741-MBC เชลล์ เกาะคา,ลำปาง",
+"21743-เอสโซ่ หนองหาน,อุดรธานี",
+"21744-MBC เอสโซ่ บ้านตาก,ตาก",
+"21745-MBC ปาดังเบซาร์,สงขลา",
+"21746-เชลล์ อีสเทิร์นซีบอร์ด,ระยอง",
+"21747-MBC ตลาดภูดอย,เชียงใหม่",
+"21748-บ้านเฉวงสมุย,สุราษฎร์ธานี",
+"21749-ตลาดสดศรีฟ้า สมุย,สุราษฎร์ธานี",
+"21750-พหลโยธิน52แยก38,กรุงเทพมหานคร",
+"21751-MBC ทุ่งลุง,หาดใหญ่",
+"21753-MBC คาลเท็กซ์ โขดหิน,ระยอง",
+"21754-MBC เอสโซ่ยางตลาด,กาฬสินธุ์",
+"21755-MBC ชุมชนวัดบางเป้ง",
+"21756-MBC ตลาดลาว มาบตาพุด",
+"21760-MBC เอสโซ่ โรงเกลือ,สระแก้ว",
+"21761-MBC คลองถนน,นนทบุรี",
+"21762-MBC ตลาดนัดชัยมงคล,ชลบุรี",
+"21763-MBC สวนเสือศรีราชา,ชลบุรี",
+"21764-ตลาดสดละไมสมุย,สุราษฎร์ธานี",
+"21765-MBC หมู่บ้านเปี่ยมสุข,นนทบุรี",
+"21766-MBC ทุ่งกราด,ชลบุรี",
+"21767-MBC คาลเท็กซ์ เชิงเนิน,ระยอง",
+"21768-MBC คาลเท็กซ์มาบไผ่,ชลบุรี",
+"21769-BCPสุขสวัสดิ์53/1,สมุทรปราการ",
+"21770-บางจากวิภาวดี 43,กรุงเทพมหานคร",
+"21771-MBC บ่อยาง,ชลบุรี",
+"21772-MBC โรงงานไลอ้อน สหพัฒน์",
+"21773-MBC ตลาดเทศบาลสกลนคร,สกลนคร",
+"21774-MBC ซอยพยอม 19,อยุธยา",
+"21775-MBC อมตะ-ตลาดยิ่งรวย,ชลบุรี",
+"21776-คาลเท็กซ์เทพารักษ์,สมุทรปราการ",
+"21777-MBC พัทยาสาย 3,ชลบุรี",
+"21778-MBC โป่ง,ชลบุรี",
+"21779-คาลเท็กซ์บางพลี,สมุทรปราการ",
+"21780-MBC ซอยทองหลาง,ชลบุรี",
+"21781-MBC ตลาดนัดท่าแซะ,ชุมพร",
+"21782-ตลาดเย็นเทศบาลท่ายาง,นครศรีฯ",
+"21783-MBC มาบยางพร-สะพานสี,ระยอง",
+"21784-MBC บ้านอ่าวน้ำเมา,กระบี่",
+"21788-MBC มทส.ประตู4,นครราชสีมา",
+"21789-โกลด์เด็นแลนด์ คู้บอน,กรุงเทพฯ",
+"21791-MBC ถนนเทศบาล25 บ้านฉาง,ระยอง",
+"21792-MBC เอื้ออาทรวัดวังหิน,ชลบุรี",
+"21793-Caltexพรานนก-พุทธมณฑล4กรุงเทพ",
+"21794-MBC เอสซี วังตาผิน,ระยอง",
+"21795-MBC เอสโซ่ ถนนสระหลวง",
+"21796-MBC บางพลีน้อย,สมุทรปราการ",
+"21797-MBC แม่ขรี,พัทลุง",
+"21798-MBC พยัคฆภูมิพิสัย",
+"21799-MBC หมู่บ้านซอยสุพรรณ,ระยอง",
+"21800-MBC คาลเท็กซ์ คลองกิ่ว,ชลบุรี",
+"21801-MBC เทิดราชัน ซอย 1,กรุงเทพฯ",
+"21802-MBC ละงู, สตูล",
+"21803-MBC จอมทอง14,กรุงเทพฯ",
+"21804-MBC กำนันแม้น 14/1,กรุงเทพฯ",
+"21805-ตลาดสดเทศบาลเมืองสะเดา,สงขลา",
+"21806-MBC คลองด่าน,สมุทรปราการ",
+"21807-MBC ตลาดบางกรวย,นนทบุรี",
+"21808-MBC ตลาดเพลินไพลิน,ปราจีนบุรี",
+"21810-MBC ตลาดเจ้าพรหม,อยุธยา",
+"21811-MBC ชุมชนเนินกระปอก,ระยอง",
+"21812-MBC ซอยอ่อนนุช 39,กรุงเทพฯ",
+"21813-หมู่บ้านนักกีฬาซอย40,กรุงเทพฯ",
+"21814-MBCถนนสุขาประชาสรรค์2,นนทบุรี",
+"21815-เชลล์พยัคฆภูมิพิสัย,มหาสารคาม",
+"21816-MBC คอนสวรรค์,ชัยภูมิ",
+"21817-MBC ตลาดเจ้าหลาว,จันทบุรี",
+"21818-MBC บางจากอมตะ,ชลบุรี",
+"21819-MBC ภูเวียง,ขอนแก่น",
+"21820-ตลาดคลองถมวัดอู่ตะเภา,ชลบุรี",
+"21821-MBC ห้างแก้ว ซอย 5,ระยอง",
+"21822-MBC วัดส้มเกลี้ยง,นนทบุรี",
+"21823-ถนนสุขาอุปถัมภ์,อุบลราชธานี",
+"21825-MBC ศรีราชานคร,ชลบุรี",
+"21826-หมู่บ้านสรัญธร,กรุงเทพมหานคร",
+"21828-MBC ถนนคลังอาวุธ, อุบลราชธานี",
+"21830-MBC กระทุ่มล้มซอย 11,นครปฐม",
+"21831-MBC คลองแงะ,สงขลา",
+"21832-MBC บ้านเขว้า,ชัยภูมิ",
+"21833-ชุมชนเฉวงใหญ่สมุย,สุราษฎร์ฯ",
+"21834-MBC สนามชัยเขต, ฉะเชิงเทรา",
+"21835-หน้าโรงพยาบาลบ้านหมี่, ลพบุรี",
+"21836-ซอยแนบเคหาสน์6,ประจวบคีรีขันธ์",
+"21837-ซอยหัวหิน 94,ประจวบคีรีขันธ์",
+"21838-โรงไฟฟ้าพระนครใต้,สมุทรปราการ",
+"21839-MBC โรงพยาบาลชัยภูมิ,ชัยภูมิ",
+"21840-MBC บ้านค่ายหมื่นแผ้ว,ชัยภูมิ",
+"21842-MBC บางจากพุทธมณฑลสาย4,นครปฐม",
+"21843-MBC มาบยางพร-วังตาผิน2,ระยอง",
+"21844-MBC มาบยางพร 19,ระยอง",
+"21845-MBC บางจากศรีราชา,ชลบุรี",
+"21846-MBC เพชรเกษมพลาซ่า,สุรินทร์",
+"21847-ตลาดเทศบาลสุรินทร์,สุรินทร์",
+"21848-MBC เดชอุดม,อุบลราชธานี",
+"21849-MBC ตลาดเจริญศรี,อุบลราชธานี",
+"21850-EssoRestAreaแม่กลองสมุทรสงคราม",
+"21851-เอสโซ่ ถนนชัยพฤกษ์,นนทบุรี",
+"21852-เอสโซ่บางนา กม.40,ฉะเชิงเทรา",
+"21854-MFC เชลล์ ปลวกแดง",
+"21855-หน้าเมืองสมุย,สุราษฎร์ธานี",
+"21856-MBC ลาซาลซอย 11,กรุงเทพฯ",
+"21858-MBC ถนนสามัคคี,นนทบุรี",
+"21859-MBC เทศบาลบ้านฉาง 46,ระยอง",
+"21860-ถนนพรประภานิมิตรพัทยา,ชลบุรี",
+"21861-MBC บ้านกรวด,บุรีรัมย์",
+"21862-MBC ตลาดบุ่งหวาย,อุบลราชธานี",
+"21863-MBC มาบยางพร 26, ระยอง",
+"21864-MBC ขามใหญ่,อุบลราชธานี",
+"21865-MBC เขื่อนอุบลรัตน์,ขอนแก่น",
+"21866-MBC สอยดาว,จันทบุรี",
+"21867-MBC สุขสวัสดิ์70,สมุทรปราการ",
+"21868-MBC หมู่บ้านนารา,ปราจีนบุรี",
+"21869-โรงพยาบาลค่ายสุรนารีนครราชสีมา",
+"21870-MBC วิหารแดง, สระบุรี",
+"21871-MBC เชียงยืน,อุดรธานี",
+"21872-ตลาดเทศบาลพิบูลมังสาหาร,อุบลฯ",
+"21873-MBC อำเภอดอนสัก,สุราษฎร์ธานี",
+"21874-MBC ตลาดบ้านพริก,นครนายก",
+"21875-MBC ถนนบางวัว 8,ฉะเชิงเทรา",
+"21877-MBC ตลาดสดรุ่งโรจน์,กระบี่",
+"21878-MBC ชุมชนหนองหว้า,ชลบุรี",
+"21879-MBC ไชยวาน,อุดรธานี",
+"21882-MBC ท่าฉลอม,สมุทรสาคร",
+"21883-MBC บ้านบ่อ,กาญจนบุรี",
+"21884-MBC ตลาดจิรกานต์,นนทบุรี",
+"21886-MBC บ้านลาดใหญ่,ชัยภูมิ",
+"21887-MBC ตลาดวัดธาตุ,หนองคาย",
+"21888-MBC สตึก,บุรีรัมย์",
+"21889-MBC กันทรวิชัย,มหาสารคาม",
+"21890-MBC สะเดียง,เพชรบูรณ์",
+"21891-ตลาดสดเทศบาลตำบลขนอม,นครศรีฯ",
+"21892-MBC ดงมูลเหล็ก, เพชรบูรณ์",
+"21893-MBC เดอะมิกซ์ นิคมพัฒนา,ระยอง",
+"21894-คาลเท็กซ์ เดอะแจส อมตะ,ชลบุรี",
+"21895-MBC เขาปีบ,ชุมพร",
+"21896-ตลาดสันติสุข2,อุบลราชธานี",
+"21897-MBC ทุ่งคา,ชลบุรี",
+"21898-ตลาดเทศบาลกันทรารมย์,ศรีสะเกษ",
+"21899-เขาตะเกียบ ,ประจวบคีรีขันธ์",
+"21900-หมู่บ้านสุกัญญา,ปราจีนบุรี",
+"21901-MBC มาบอำมฤต,ชุมพร",
+"21902-บ้านแม่น้ำสมุย,สุราษฎร์ธานี",
+"21903-MBC ถนนราชชุมพล คอ.2,ระยอง",
+"21904-MBC เอสโซ่เขาแหลม, จันทบุรี",
+"21905-MBC เอสโซ่ มโนรมย์,ชัยนาท",
+"21906-MBC นครชัยมงคล,ปทุมธานี",
+"21907-MBC แยกช่อระกา,ชัยภูมิ",
+"21908-MBC ลำปลายมาศ,บุรีรัมย์",
+"21909-ม.ศิริวรรณ-บางบัวทอง, นนทบุรี",
+"21910-MBC ครบุรี,นครราชสีมา",
+"21912-โอเอซิส-พัฒนาการ53,กรุงเทพฯ",
+"21913-MBC หนองนิล,สุราษฎร์ธานี",
+"21914-MBC ห้วยวังนอง, อุบลราชธานี",
+"21915-MBC คลองใหญ่,ตราด",
+"21916-MBC คลองสน, ตราด",
+"21917-MBC ประชาอุทิศ-คู่สร้าง",
+"21918-MBCศรีสวัสดิ์ดำเนิน,มหาสารคาม",
+"21919-MBC สาขาถนนกะละพอ,ปัตตานี",
+"21920-MBC แยกโคกขวาง, ปราจีนบุรี",
+"21921-MBC นาวังตะเคียนเตี้ย,ชลบุรี",
+"21922-MBC สนม,สุรินทร์",
+"21923-MBC บ้านลภาวัน10,นนทบุรี",
+"21924-MBC เอื้ออาทรวัดกู้,นนทบุรี",
+"21925-ถนนอุบล-ตระการ,อุบลราชธานี",
+"21926-MBC เขมราฐ,อุบลราชธานี",
+"21927-MBC ซอยร่วมพัฒนา,ชลบุรี",
+"21929-MBC หนองแขวะ,ชลบุรี",
+"21930-MBC บางขนุน, นนทบุรี",
+"21931-MBC แหลมแท่น,ชลบุรี",
+"21932-MBC เอสโซ่หนองเบน,นครสวรรค์",
+"21933-MBC ซอยสวนส้ม,สมุทรสาคร",
+"21934-ชุมชนวัดสะแก,พระนครศรีอยุธยา",
+"21935-MBC เอสโซ่ บางคล้าขาเข้า",
+"21936-MBC ท่าตูม,สุรินทร์",
+"21937-MBC ลำดวน,สุรินทร์",
+"21938-MBC ซอยกำนัน,อุดรธานี",
+"21939-อินนิซิโอสำเร็จพัฒนา,นนทบุรี",
+"21940-MBC ปะทิว,ชุมพร",
+"21941-MBC ตลาดบ้านปากน้ำ,เพชรบูรณ์",
+"21942-MBC ตลาดเทศบาลบึงกาฬ,บึงกาฬ",
+"21943-MBC แยกต้นแกว๋น,เชียงใหม่",
+"21944-MBC ถนนหฤทัย,ชัยภูมิ",
+"21945-ตลาดโรงเกลือพระพุทธบาท,สระบุรี",
+"21946-MBC เซกา,บึงกาฬ",
+"21947-MBC ปะคำ,บุรีรัมย์",
+"21948-MBC หน้ารพ.อำนาจเจริญ",
+"21949-MBCตลาดเทศบาล ดงแคนใหญ่,ยโสธร",
+"21950-MBC ชุมชนหนองคล้า,ชลบุรี",
+"21951-MBC ตลาดไดโนเสาร์ใหม่,ประจวบฯ",
+"21952-MBC ถนนจิระ,บุรีรัมย์",
+"21953-MBC ราชภัฏยะลา,ยะลา",
+"21954-MBC ถนนมะกรูด,ปัตตานี",
+"21955-MBC บ้านช้าง,ชลบุรี",
+"21956-MBC ผดุงพันธ์ ซอย13,กรุงเทพฯ",
+"21957-MBC ตลาดกวางทอง,สระบุรี",
+"21959-MBC บ้านหัวนา,กาญจนบุรี",
+"21960-MBC ควนมะพร้าว,พัทลุง",
+"21961-บ้านท่าเคียนหาดใหญ่,สงขลา",
+"21962-หมู่บ้านอยู่สุข,สมุทรปราการ",
+"21963-MBCถนนตลาดล่าง,สุราษฏร์ธานี",
+"21964-MBC ซอยอยู่เจริญคลองสวน",
+"21965-ถนนเลี่ยงเมืองหนองมน,ชลบุรี",
+"21966-แยกโก้งโค้งหาดใหญ่,สงขลา",
+"21967-ซอยจตุโชติ11,กรุงเทพมหานคร",
+"21968-MBC ตลาดทุ่งลม,เพชรบุรี",
+"21969-MBC ตลาดท่าเกษม,สระแก้ว",
+"21970-MBC พระทองคำ,นครราชสีมา",
+"21971-หาดละไมสมุย,สุราษฎร์ธานี",
+"21972-MBC หมู่บ้านกิตติชัย18,นครปฐม",
+"21973-MBC ถนนนาเกลือ,ปัตตานี",
+"21974-MBC ซอยมัยลาภ,กรุงเทพมหานคร",
+"21975-MBC เขาพระตำหนัก ซอย 5,ชลบุรี",
+"21976-MBC สวี,ชุมพร",
+"21977-MBC บ้านชุมทอง,บุรีรัมย์",
+"21978-MBC ตลาดโคกหนามแท่ง,สระบุรี",
+"21979-MBC บางจากนครพนม,นครพนม",
+"21980-คาลเท็กซ์ ถนนวัดศรีวารีน้อย",
+"21981-คาลเท็กซ์331-เขาคันทรง,ชลบุรี",
+"21982-MBC ปัทมานนท์,สุรินทร์",
+"21983-MBC ถ้ำพรรณรา,นครศรีธรรมราช",
+"21984-MBC โพนพิสัย,หนองคาย",
+"21985-MBC ปากคาด,บึงกาฬ",
+"21986-MBC โพธิสารพัทยา,ชลบุรี",
+"21987-MBC ห้วยทราย,สระบุรี",
+"21988-MBC คาล์เท็กซ์ เจ้าคุณทหาร",
+"21990-MBC เจริญสินธานี-ห้วยปราบ",
+"21991-MBC บ้านดุง,อุดรธานี",
+"21992-MBC คำชะโนด,อุดรธานี",
+"21993-สาขาถนนสามชัยหาดใหญ่,สงขลา",
+"21996-MBC เขวา สินรินทร์,สุรินทร์",
+"21997-MBC บางสีทอง,นนทบุรี",
+"21998-MBC นนทบุรี39,นนทบุรี",
+"21999-หัวหินซอย 102,ประจวบคีรีขันธ์",
+"22000-MBC วังใหม่,สระแก้ว",
+"22001-เมืองใหม่ใต้แหลมฉบัง,ชลบุรี",
+"22002-MBC แม่น้ำคู้ ซอย3,ระยอง",
+"22003-MBC รัตนวาปี,หนองคาย",
+"22004-MBC บึงสามพัน,เพชรบูรณ์",
+"22005-MBC ลืออำนาจ,อำนาจเจริญ",
+"22006-MBC เก้ากิโลซอย 31,ชลบุรี",
+"22007-ตลาดครอบครัวท่าพระ1รัชดาฯ",
+"22008-ตลาดครอบครัวท่าพระ2เทอดไท33",
+"22009-คาลเท็กซ์รังสิตคลอง3,ปทุมธานี",
+"22010-MBC วังตะไคร้-นางรอง,นครนายก",
+"22011-MBC ตลาด ก.สุปัญญา,สระแก้ว",
+"22012-MBC บ้านทุ่งดินขอ,สระบุรี",
+"22014-MBC ชุมชนบ่อหิน,หนองคาย",
+"22015-MBC ถนนศิริรักษ์, ชลบุรี",
+"22016-MBC อ่างเก็บน้ำบางพระ,ชลบุรี",
+"22017-MBC บางม่าเหลา,ภูเก็ต",
+"22018-MBC ซอยตาเอียด,ภูเก็ต",
+"22019-MBC ควนหิน,สงขลา",
+"22020-MBC นาเกลือ ซอย 12,ชลบุรี",
+"22021-MBC บางหัวเสือ,สมุทรปราการ",
+"22022-MBC สาขาถนนเทศบาล 4,ยะลา",
+"22023-MBC พัทยากลางซอย 12,ชลบุรี",
+"22024-เทพประสิทธิ์8พัทยา,ชลบุรี",
+"22025-MBC ตลาดรถไฟปราณบุรี",
+"22026-โรงโป๊ะ-ตะเคียนเตี้ย,ชลบุรี",
+"22027-MBC ตลาดไร่ขิง 42,นครปฐม",
+"22028-MBC ทับมา,ระยอง",
+"22029-MBC บางศรีเมือง,นนทบุรี",
+"22030-MBC DEPOT ประโคนชัย",
+"22031-MBC คาลเท็กซ์ บางนา กม.20",
+"22032-คาลเท็กซ์ เอกชัย-บางบอน",
+"22033-MBC ศรีเทพ,เพชรบูรณ์",
+"22034-MBC ตลาดมรกต2,ชุมพร",
+"22035-MBC โชคชัย 4 ซอย 70,กรุงเทพฯ",
+"22036-MBC บ้านโภชน์,เพชรบูรณ์",
+"22037-MBC ท่าบ่อ,หนองคาย",
+"22038-MBC ถนนธานี-หนองแปป,บุรีรัมย์",
+"22039-MBC แคนดง,บุรีรัมย์",
+"22040-MBC เอสโซ่วังน้ำเย็น,สระแก้ว",
+"22041-ถนนราษฎร์อุทิศหาดใหญ่,สงขลา",
+"22042-MBC กุดข้าวปุ้น,อุบลราชธานี",
+"22043-MBC ธาตุพนม,นครพนม",
+"22045-เดอะมิราเคิล พลัส เพชรเกษม 63",
+"22046-MBC ปทุมราชวงศา,อำนาจเจริญ",
+"22047-MBC หอแก้ว,มุกดาหาร",
+"22049-MBC สังคม,หนองคาย",
+"22050-สามแยกเฉวงสมุย,สุราษฎร์ธานี",
+"22051-MBC ตลาดเทศบาล1,ยโสธร",
+"22052-MBC ศรีเมืองใหม่,อุบลราชธานี",
+"22053-ถนนนิพัทธ์ภักดีหาดใหญ่,สงขลา",
+"22054-MBC ถนนหลวงพ่อแช่ม,ภูเก็ต",
+"22056-MBC ตลาดตุนทรัพย์,ฉะเชิงเทรา",
+"22057-MBC อำเภอท่าม่วง,กาญจนบุรี",
+"22058-MBC เกษตรสมบูรณ์,ชัยภูมิ",
+"22059-MBC วัดหนองตำลึง,ชลบุรี",
+"22060-MBC บางจากทุ่งคอก,สุพรรณบุรี",
+"22061-ถนนเฉลิมบูรพาชลทิต-เจ้าหลาว",
+"22062-MBC หนองไม้แก่น,ชลบุรี",
+"22063-MBC ชลบุรีสเตเดียม,ชลบุรี",
+"22064-MBC ทรัพย์บุญชัย,สมุทรปราการ",
+"22065-MBC อ่อนนุช 65,กรุงเทพมหานคร",
+"22066-MBC ชุมชนพยูน-บ้านฉาง,ระยอง",
+"22067-MBC บางคูลัด,นนทบุรี",
+"22068-MBC จันดี, นครศรีธรรมราช",
+"22069-MBC คาลเท็กซ์ แคหวาย,เชียงราย",
+"22070-MBC ตาพระยา,สระแก้ว",
+"22071-MBC ห้วยทับทัน,ศรีสะเกษ",
+"22072-MBC ตลาดสดบ่อผุดสมุย",
+"22073-MBC ใสยวน, ภูเก็ต",
+"22074-MBC ตลาดบุญให้, นครปฐม",
+"22075-MBC พฤกษา วิลเลจ 12,ปทุมธานี",
+"22076-MBC อ่างศิลาสามมุก, ชลบุรี",
+"22077-MBC ห้วยราช,บุรีรัมย์",
+"22079-MBC ศรีบุญเรือง, หนองบัวลำภู",
+"22080-MBCตลาดสดแม่น้ำ ซ.7เกาะสมุย",
+"22081-สาขาตลาดเจริญลาภ เกาะสมุย",
+"22082-MBCซอยไทยประกัน,สมุทรปราการ",
+"22083-โรงพยาบาลกุมภวาปี, อุดรธานี",
+"22084-MBC ถนนธนะวิถี,สระแก้ว",
+"22085-บางจาก บางนา กม.27,ขาเข้า",
+"22087-MBC สีคิ้ว, นครราชสีมา",
+"22088-MBCอำเภอวิภาวดี, สุราษฎร์ธานี",
+"22089-MBC ตลาดสดสนามบิน สมุย",
+"22090-MBC ตลาดมารวย, นครปฐม",
+"22091-โรงพยาบาลสิชล, นครศรีธรรมราช",
+"22092-MBC อินทามระ 59,กรุงเทพฯ",
+"22093-MBC แหลมสิงห์,จันทบุรี",
+"22094-MBC ป่าติ้ว,ยโสธร",
+"22095-MBC เทศบาลพัฒนา-แสนสุข,ชลบุรี",
+"22097-MBC นาหว้า,นครพนม",
+"22098-หมู่บ้านสิวารัตน์3, สมุทรสาคร",
+"22099-MBC คู้คลองเก้า,กรุงเทพฯ",
+"22100-ถนนกันทรลักษณ์,อุบลราชธานี",
+"22101-MBC โรงพยาบาลลำพูน2,ลำพูน",
+"22102-MBC ห้วยบง,นครราชสีมา",
+"22103-MBC ราษีไศล,ศรีสะเกษ",
+"22104-MBC ซอยนาคนิวาส 37,กรุงเทพฯ",
+"22105-MBC ภู่ยอดยิ่ง,สมุทรสาคร",
+"22106-หมู่บ้านรติรมย์พาร์ค,นนทบุรี",
+"22107-MBCชุมชนบ้านโพธิ์,นครราชสีมา",
+"22108-MBC ถนนประจักษ์,หนองคาย",
+"22109-MBC ตลาดมรกต1,ชุมพร",
+"22110-MBC เขาทะลุ,ชุมพร",
+"22111-MBC ถนนศรีสะเกษ, อุบลราชธานี",
+"22112-เคหะชุมชนเพชรบูรณ์,เพชรบูรณ์",
+"22113-MBC เทพคุณากร,ฉะเชิงเทรา",
+"22114-MBC ถนนสวนตะไคร้,นครปฐม",
+"22115-MBC เลี่ยงหนองมน,ชลบุรี",
+"22116-MBC อีซีพ้อยท์พัทยา 1,ชลบุรี",
+"22117-MBC หนองใหญ่,ชลบุรี",
+"22118-MBC เลิงนกทา,ยโสธร",
+"22119-MBC หนองซ้ำซาก,ชลบุรี",
+"22120-MBC ด่านสาม,ชลบุรี",
+"22122-MBC เคหะจันทบุรี1,จันทบุรี",
+"22123-MBC ไผ่ขวาง,สุพรรณบุรี",
+"22124-MBC เขากระโดง,บุรีรัมย์",
+"22125-MBCสะแกงามวิลล่า,กรุงเทพฯ",
+"22127-MBC ซอยธนสิทธิ์,สมุทรปราการ",
+"22128-MBC ทองผาภูมิ,กาญจนบุรี",
+"22129-MBC ถนนกรมหลวงชุมพร,ชุมพร",
+"22131-MBC_DEPOT ตาคลี",
+"22132-MBC คลองสนเกาะช้าง,ตราด",
+"22133-MBCหาดทรายขาวเกาะช้าง,ตราด",
+"22134-ตลาดใหม่ดอนกลาง,อุบลราชธานี",
+"22135-MBC ดีโป้ประทาย,นครราชสีมา",
+"22136-ดีโป้กุฉินารายณ์,กาฬสินธุ์",
+"22137-MBC ท่าชนะ,สุราษฎร์ธานี",
+"22138-MBC ตลาดหนองแฟบ,ชลบุรี",
+"22139-MBC ซอยกอไผ่,ชลบุรี",
+"22140-MBC ถนนนาเกลือ 2,ปัตตานี",
+"22141-MBC หาดคลองม่วง,กระบี่",
+"22143-MBC ถนนพ่อขุน,เชียงราย",
+"22144-MBC ภูเก็ตแฟนตาซี,ภูเก็ต",
+"22145-MBCวงแหวนบางขุนเทียน,กรุงเทพฯ",
+"22146-MBC ห้วยท่าช้าง,เพชรบุรี",
+"22147-สุขาภิบาล5 ซอย32,กรุงเทพมหานคร",
+"22148-MBC หมู่บ้านศรีสุชาติ,ภูเก็ต",
+"22149-MBCถนนสามัคคี สาย ข.,ปัตตานี",
+"22151-MBC คาลเท็กซ์ติวานนท์,นนทบุรี",
+"22152-MBC ตลาดท่าประชุม,ปราจีนบุรี",
+"22153-MBC ตลาดเทศวิวัฒน์,ปัตตานี",
+"22154-MBC เดอะคริสตัล304,ปราจีนบุรี",
+"22155-MBC ถนนมหาราช,กระบี่",
+"22156-MBC หัวหมาก,กรุงเทพฯ",
+"22157-MBC ตลาดหนองคล้าใหม่,ชลบุรี",
+"22158-MBC ตลาดนัดลำพญา,นครปฐม",
+"22159-สาขาตลาดมากินตะหาดใหญ่,สงขลา",
+"22160-MBC ตลาดเทศบาลสตึก,บุรีรัมย์",
+"22161-MBC บรบือ,มหาสารคาม",
+"22162-หนองคอก ท่าตะเกียบ,ฉะเชิงเทรา",
+"22164-MBC บ่อไร่,ตราด",
+"22165-MBC วิภาวดี 60,กรุงเทพมหานคร",
+"22166-MBC ตลาดยิ่งเจริญ,มหาสารคาม",
+"22167-MBC ซอยเจริญลาภ,ภูเก็ต",
+"22168-MBC โคกโตนด,ภูเก็ต",
+"22169-แจ้งวัฒนะ-ปากเกร็ด21,นนทบุรี",
+"22170-MBC ตือเบาะ,ยะลา",
+"22171-บ้านเอื้ออาทรร้อยเอ็ด,ร้อยเอ็ด",
+"22172-MBC ถนนคชพลายุกต์,ร้อยเอ็ด",
+"22173-บ้านสวย3 ท่าตูม,ปราจีนบุรี",
+"22174-MBC อำเภอหนองจิก,ปัตตานี",
+"22176-MBC เคหะธัญบุรี,ปทุมธานี",
+"22177-MBC หาดไม้ขาว,ภูเก็ต",
+"22178-MBC รามอินทรา 99,กรุงเทพฯ",
+"22179-มหาวิทยาลัยราชภัฏศรีสะเกษ",
+"22180-โกลเด้นเพลส บางใหญ่,นนทบุรี",
+"22181-MBC ถนนสิโรรส 1,ยะลา",
+"22182-หมู่บ้านสัมมากรชัยพฤกษ์-วงแหวน",
+"22183-ม.เทคโนโลยีราชมงคล กรุงเทพ",
+"22184-MBC ใหม่เกตุงาม,ชลบุรี",
+"22185-MBC ด่านทับตะโก, ราชบุรี",
+"22186-MBC หนองจับเต่า,ชลบุรี",
+"22187-MBC สาขาบ้านสะพลี,ชุมพร",
+"22188-บางจากเกษตร-นวมินทร์,กรุงเทพฯ",
+"22189-ตลาดนิคมพระพุทธบาท,สระบุรี",
+"22190-มาบยางพร บึงประดิษฐ์,ระยอง",
+"22191-ถนนผังเมือง4ซอยกอบฤทธิ์,ยะลา",
+"22192-MBC ชุมชนพระขาว,อยุธยา",
+"22193-MBC ตลาดรุ่งโรจน์เจริญทรัพย์",
+"22194-MBC บ้านทะเลน้อย,พัทลุง",
+"22195-MBC กันทรลักษ์,ศรีสะเกษ",
+"22196-MBC มาบยางพร-เปี่ยมสุข,ระยอง",
+"22198-วิเศษสุขนคร เฟส 2,สมุทรสาคร",
+"22199-MBC วัดแหลมฟ้าผ่า,สมุทรปราการ",
+"22200-พรสว่างนิเวศน์,สมุทรปราการ",
+"22201-คาลเท็กซ์นาจอมเทียน,ชลบุรี",
+"22202-MBC คาลเท็กซ์นิคมปิ่นทอง 2",
+"22203-MBC เดอะไนน์ราชบุรี,ราชบุรี",
+"22204-เลียบคลองภาษีเจริญฝั่งเหนือ",
+"22205-MBC สามแยกโรงโฟม,นนทบุรี",
+"22206-MBC บ้านสวยน้ำใส,ฉะเชิงเทรา",
+"22207-MBC ชุมชนนพรัตน์ธารา,กระบี่",
+"22208-MBC ตลาดคุ้มทรัพย์,นนทบุรี",
+"22209-MBC พยุห์,ศรีสะเกษ",
+"22210-MBC โกรกกราก,สมุทรสาคร",
+"22211-BC อำเภอยะรัง,ปัตตานี",
+"22212-MBC โพนทอง,ร้อยเอ็ด",
+"22213-MBC สุขุมวิท-ระยอง38,ระยอง",
+"22214-หมู่บ้านทิพวัล,สมุทรปราการ",
+"22215-บ้านปลายแหลมสมุย",
+"22216-ถนนพ่อขุนทะเล,สุราษฎร์ธานี",
+"22217-ถนนเจริญประดิษฐ์ ซอย1,ปัตตานี",
+"22219-MBC สตรีวิทยา2 ซอย20,กรุงเทพฯ",
+"22220-MBC อำเภอกระบุรี,ระนอง",
+"22221-บ้านใหญ่-บางพระ,ฉะเชิงเทรา",
+"22222-MBC ถนนพระบารมี ป่าตอง,ภูเก็ต",
+"22223-MBC บ้านแซร์ออ,สระแก้ว",
+"22224-MBC ลิ่นถิ่น,กาญจนบุรี",
+"22225-ตลาดสดนับอนุสรณ์,นครศรีธรรมราช",
+"22226-MBC ชุมชนท่าเรือ,อยุธยา",
+"22228-MBC ถนนผังเมือง 5,ยะลา",
+"22229-MBC บางวัว ซ.4,ฉะเชิงเทรา",
+"22230-หมู่บ้านเสรีอ่อนนุช,กรุงเทพฯ",
+"22231-ปากพนังตะวันออก,นครศรีธรรมราช",
+"22232-MBC บางใหญ่-บางคูลัด,นนทบุรี",
+"22233-ซอยร่วมใจสามัคคี,กรุงเทพมหานคร",
+"22234-MBC โพธิ์ไทร,อุบลราชธานี",
+"22235-MBC สุขสวัสดิ์ 74,สมุทรปราการ",
+"22236-MBCภูมิใจนิเวศน์3,สมุทรปราการ",
+"22237-ถ.บางบ่อแปลงยาว,ฉะเชิงเทรา",
+"22238-MBC หนองกุงศรี,กาฬสินธุ์",
+"22239-MBC บ้านนายาว,ฉะเชิงเทรา",
+"22240-MBC ถ.บัวครินทร์,สมุทรปราการ",
+"22241-MBC บางบอน3,กรุงเทพฯ",
+"22242-MBC พฤกษา26,นนทบุรี",
+"22243-MBC ประชาอุทิศ 33,กรุงเทพฯ",
+"22244-MBC บางปิ้ง,สมุทรปราการ",
+"22245-MBC กลางซอยห้างแก้ว,ระยอง",
+"22246-MBC ไทรโยคน้อย,กาญจนบุรี",
+"22247-MBC ถ.ผังเมือง4ซ.บานา,ยะลา",
+"22248-MBC บางราวนก,นนทบุรี",
+"22249-MBCรามคำแหง 24 แยก 6,กรุงเทพฯ",
+"22250-MBC ถ.เจษฎาวิถี, สมุทรสาคร",
+"22251-MBC แปลงยาว2,ฉะเชิงเทรา",
+"22252-MBC หาดใหญ่ใน,สงขลา",
+"22253-MBC ม.เมืองยิ้ม สาย7,นครปฐม",
+"22254-MBC ซ.ที่ดินบางบัวทอง,นนทบุรี",
+"22255-MBC พหลโยธิน34 แยก11,กรุงเทพฯ",
+"22256-MBC เพชรเกษม 63,กรุงเทพฯ",
+"22257-ชุมชนวัดเฉลิมพระเกียรติ,นนท์ฯ",
+"22258-บางเลน-รัตนาธิเบศร์,นนทบุรี",
+"22259-MBC พหลโยธิน 48,กรุงเทพฯ",
+"22260-MBC เพชรเกษม 88,กรุงเทพฯ",
+"22261-MBC ตลาดทรัพย์พูลมา,สระบุรี",
+"22262-MBC ถนนอำเภอ,ภูเก็ต",
+"22263-MBC ตลาดบางซ้าย,อยุธยา",
+"22264-MBCตลาดนัดแม่เล้ง, ฉะเชิงเทรา",
+"22265-MBC หัวถนน,นครศรีธรรมราช",
+"22266-MBC หัวตะพาน,อำนาจเจริญ",
+"22267-MBC ม.ประดับดาว,นนทบุรี",
+"22268-MBC ศรีขรภูมิ,สุรินทร์",
+"22269-MBC พนา,อำนาจเจริญ",
+"22270-MBC ตลาดวังจันทร์,ระยอง",
+"22271-MBC สมชายพัฒนา,นนทบุรี",
+"22272-MBC มวกเหล็ก-เขาใหญ่,สระบุรี",
+"22273-MBC บางแวก62,กรุงเทพฯ",
+"22274-คลองเดื่อ-เขาใหญ่,นครราชสีมา",
+"22275-MBC ศรีด่าน3, สมุทรปราการ",
+"22276-MBC ตลาดเกาะหมี,สงขลา",
+"22278-ลาดปลาเค้า 44,กรุงเทพฯ",
+"22280-MBC อ.สะบ้าย้อย,สงขลา",
+"22281-เลียบคลองเทพกาญจนา,สมุทรสาคร",
+"22282-MBC จตุรพักตรพิมาน,ร้อยเอ็ด",
+"22283-MBC อ.ท้ายเหมือง,พังงา",
+"22284-MBC ไทรน้อย-ต้นเชือก,นนทบุรี",
+"22285-MBC นบพิตำ,นครศรีธรรมราช",
+"22286-MBC ท่าช้าง,นครราชสีมา",
+"22287-MBC ชุมชนในไร่,ระยอง",
+"22289-MBC ตลาดบ้านคลองเตย,สงขลา",
+"22290-MBC วัดกลางบางปะกง,ฉะเชิงเทรา",
+"22291-MBC ลาดพร้าว ซอย 1,กรุงเทพฯ",
+"22292-MBC โพนสวรรค์,นครพนม",
+"22293-MBC ตลาดเมืองใหม่,ยะลา",
+"22294-ถ.ลาดพร้าว-วังหิน,กรุงเทพฯ",
+"22297-MBC ซ.บ่อทอง9,ปัตตานี",
+"22298-MBC พรเจริญ,บึงกาฬ",
+"22299-MBC อ.สายบุรี,ปัตตานี",
+"22300-MBC ตำบลนาประดู่, ปัตตานี",
+"22301-MBC ทีซีซีเยาวราช, กรุงเทพฯ",
+"22302-MBC บ้านแสนตอ, กาญจนบุรี",
+"22303-MBC ชุมชนบาเละฮีเล ,นราธิวาส",
+"22304-ไฮเปอร์สุขสวัสดิ์,สมุทรปราการ",
+"22305-ม.เทคโนโลยีราชมงคลพระนครใต้",
+"22306-MBC ตลาดบางนาค, นราธิวาส",
+"22307-MBC อำเภอยะหา, ยะลา",
+"22308-MBC โขงเจียม, อุบลราชธานี",
+"22309-MBC ชุมชนเมาะสือแม, นราธิวาส",
+"22310-MBC เชียงคาน,เลย",
+"22311-BCP บางน้ำเปรี้ยว,ฉะเชิงเทรา",
+"22313-MBC บ้านปลายหริก,สุราษฎร์ธานี",
+"22315-ซอย วปอ.11,สมุทรสาคร",
+"22316-MBCปากน้ำปราณ,ประจวบคีรีขันธ์",
+"22317-MBC ตลาดวัฒนานคร,สระแก้ว",
+"22318-MBC อำเภอยะหริ่ง, ปัตตานี",
+"22319-MBC บ้านโคคลาน, สระแก้ว",
+"22320-MBC เรณูนคร, นครพนม",
+"22321-ถนนคนเดินเซาะกราว, บุรีรัมย์",
+"22322-MBC ผาขาว, เลย",
+"22323-ตลาดนัดบุญศรีชากกอไผ่,ระยอง",
+"22324-MBC อำเภอปะนาเระ, ปัตตานี",
+"22325-MBC อ.ยี่งอ,นราธิวาส",
+"22326-MBC อ.บันนังสตา,ยะลา",
+"22327-MBC มหาชนะชัย,ยโสธร",
+"22328-MBC เจริญศิลป์,สกลนคร",
+"22329-MBC ตลาดตันหยงมัส,นราธิวาส",
+"22330-MBC อำเภอบาเจาะ,นราธิวาส",
+"22331-MBC บ้านตาก,ตาก",
+"22332-MBC แม่เมาะ,ลำปาง",
+"22333-MBC กุดดินจี่,หนองบัวลำภู",
+"22334-MBC ตลาด ส.นงนุช,อุดรธานี",
+"22335-MBC ตลาดเฮงทวีแก่งหางแมว",
+"22336-MBC ปางล้อนิคม,แม่ฮ่องสอน",
+"22337-เลียบคลองมะเดื่อ,สมุทรสาคร",
+"22338-MBC คลองแม่ลาย,กำแพงเพชร",
+"22339-MBC อำเภอตากใบ,นราธิวาส",
+"22340-MBC เสริมงาม,ลำปาง",
+"22341-MBC บางบอน5,กรุงเทพฯ",
+"22342-MBC BCP พุทธมณฑล สาย 5,นครปฐม",
+"22343-MBC ซ.แอล เอ ไบซีเคิ้ล,นครปฐม",
+"22344-MBC แยกห้วยไผ่, ราชบุรี",
+"22345-สันตินครบางนา ตราด",
+"22346-MBC ถ.โพธิสาร,ขอนแก่น",
+"22347-MBC อ.สุไหงปาดี, นราธิวาส",
+"22348-MBC เพชรเกษม 28, กรุงเทพฯ",
+"22349-MBC ต้นเหรียง,นครศรีธรรมราช",
+"22350-MBC หนองน้ำเย็น,ระยอง",
+"22351-MBC สุไหงโก-ลก, นราธิวาส",
+"22352-MBC โนนสัง, หนองบัวลำภู",
+"22353-MBC อำเภอมายอ, ปัตตานี",
+"22354-MBC ซ.โรมัน-เปรโต,นครปฐม",
+"22355-MBC ลี้,ลำพูน",
+"22356-MBC BCP กัลปพฤกษ์,กรุงเทพฯ",
+"22357-MBC ประชาอุทิศ 69,กรุงเทพฯ",
+"22359-ชุมชนวัดใหญ่ชัยมงคล, อยุธยา",
+"22360-เทศบาลบางปลา ซ.7, สมุทรสาคร",
+"22361-MBC แม่สะเรียง, แม่ฮ่องสอน",
+"22362-MBC บ้านม่วง, สกลนคร",
+"22363-ศาลเจ้าพ่อเสือรามอินทรา 5",
+"22365-MBC สหัสขันธ์,กาฬสินธุ์",
+"22366-MBC ภูเขียว,ชัยภูมิ",
+"22367-MBC ตรอกข้าวหลาม,ฉะเชิงเทรา",
+"22368-เขื่อนป่าสักชลสิทธิ์,ลพบุรี",
+"22369-MBCตลาดเทศบาลพรรณานิคม,สกลนคร",
+"22370-MBC ราชรถ,พิจิตร",
+"22371-MBC ฮอด,เชียงใหม่",
+"22372-MBC อ.ศรีสาคร,นราธิวาส",
+"22373-MBC อำเภอรือเสาะ,นราธิวาส",
+"22374-MBC กาดสันปูเลย,ลำพูน",
+"22375-MBC นาด้วง,เลย",
+"22376-MBC ถนนสาย15,ยะลา",
+"22377-MBC ภูเรือ,เลย",
+"22378-MBC เนินกระบก,ชลบุรี",
+"22379-MBC ประชาร่วมใจ 17,กรุงเทพฯ",
+"22380-MBC ตลาดนัดหมู่บ้านสานฝัน",
+"22381-MBC แม่ปะ,ตาก",
+"22382-MBC ถ.นเรศวร,ลพบุรี",
+"22383-MBC บ้านเบิก,ลพบุรี",
+"22384-MBC เลียบคลองภาษีเจริญฝั่งใต้",
+"22385-MBC หนองบัวกาญจน์, กาญจนบุรี",
+"22386-MBC อ.ส่องดาว, สกลนคร",
+"22387-MBC บ้านเลื่อม, อุดรธานี",
+"22388-MBC ซ.หมอย้อย-ศรีราชา,ชลบุรี",
+"22389-MBCเชียงดาว,เชียงใหม่",
+"22391-MBCโขดหิน-เขาไผ่,ระยอง",
+"22392-MBC ตันหยงมัส 2,นราธิวาส",
+"22393-MBC ตาบา,นราธิวาส",
+"22394-MBC แม่แจ่ม,เชียงใหม่",
+"22395-MBC บ้านโกตามารู, ยะลา",
+"22396-MBC บ้านหินเพิง, ชลบุรี",
+"22397-MBC รามัน, ยะลา",
+"22398-MBC ปลาปาก,นครพนม",
+"22399-MBC ทุ่งยางแดง,ปัตตานี",
+"22400-MBC กะพ้อ,ปัตตานี",
+"22401-MBC ศรีเชียงใหม่, หนองคาย",
+"22402-MBC บ้านนาสาร,สุราษฎร์ธานี",
+"22403-MBC ต้นไทร,นราธิวาส",
+"22404-MBC คลองปาง,ตรัง",
+"22405-MBC ป่าพะยอม,พัทลุง",
+"22406-บิ๊กซีสำนักงานใหญ่,กรุงเทพฯ",
+"22407-MBC ชานุมาน,อำนาจเจริญ",
+"22408-MBC อำเภอเจาะไอร้อง,นราธิวาส",
+"22409-MBC สุไหงโก-ลก 2,นราธิวาส",
+"22410-MBC พุทธบูชา,กรุงเทพฯ",
+"22411-MBC เอกชัย 66,กรุงเทพฯ",
+"22412-MBC โคกโพธิ์,ปัตตานี",
+"22413-MBC ตลาดพิกุลทอง,ราชบุรี",
+"22414-MBC หนองพังพวย,ชลบุรี",
+"22415-MBC บ้านเนียง,ยะลา",
+"22416-MBC แม่ริม,เชียงใหม่",
+"22417-MBC จะแนะ,นราธิวาส",
+"22418-MBC ชุมชนยะกัง,นราธิวาส",
+"22419-MBC ถ.มาบยางพร48, ชลบุรี",
+"22420-MBC กรือเซะ,ปัตตานี",
+"22422-MBC ศรีสงคราม,นครพนม",
+"22423-MBC กรีนมาร์เก็ตมอ.ปัตตานี",
+"22424-MBC ชุมชนหนองจอก,ระยอง",
+"22425-MBC เอื้ออาทรคลองแห,สงขลา",
+"22426-MBC มลายูบางกอก,ยะลา",
+"22427-MBC กรงปีนัง,ยะลา",
+"22428-ถ.ทรายทอง4สุไหงโก-ลก",
+"22429-MBC ดอยสะเก็ด,เชียงใหม่",
+"22430-MBC เอื้ออาทรศาลายา 3,นครปฐม",
+"22431-MBC บ้านไผ่แจ้งสนิท,ขอนแก่น",
+"22432-MBC ดุซงญอ,นราธิวาส",
+"22433-MBC ซ.ประชาทร,กรุงเทพฯ",
+"22434-MBC กาบัง,ยะลา",
+"22436-MBC ชุมชนหนองพอก,ร้อยเอ็ด",
+"22437-MBC ลานกระบือ,กำแพงเพชร",
+"22438-MBC น้ำยืน,อุบลราชธานี",
+"22439-MBC CTX บางใหญ่,นนทบุรี",
+"22440-ซ.เพชรเกษม 110 แยก 7,กรุงเทพฯ",
+"22441-MBC จะบังติกอ,ปัตตานี",
+"22442-ถ.บ้านกล้วย ไทรน้อย,นนทบุรี",
+"22443-MBC หน้าโรงพยาบาลเบตง,ยะลา",
+"22444-MBC แยกศาลาประชาคมเบตง,ยะลา",
+"22445-MBC กรุงเทพนนท์ ซ.12,นนทบุรี",
+"22446-MBC ริมเมย,ตาก",
+"22447-MBC ปางมะผ้า,แม่ฮ่องสอน",
+"22448-ม.กรุงศรีธานี,พระนครศรีอยุธยา",
+"22449-สถาบันบัณฑิตพัฒนศิลป์ศาลายา",
+"22450-MBC วังศาลา,กาญจนบุรี",
+"22451-MBC ตลาดต้นมะเกลือ,ศรีสะเกษ",
+"22452-MBC ถนนรวมมิตร,ยะลา",
+"22453-MBC พญาเม็งราย,เชียงราย",
+"22454-MBC ค่ายบกหวาน,หนองคาย",
+"22455-MBC บ้านโคกฟันโปง,ขอนแก่น",
+"22456-MBC อ.วัดเพลง,ราชบุรี",
+"22457-MBC กาดอินทร,ลำพูน",
+"22458-MBC บ้านซับม่วง,นครราชสีมา",
+"22459-MBC ขนงพระ เขาใหญ่,นครราชสีมา",
+"22460-MBC ชุมชนพัฒนะ,ยะลา",
+"22461-MBC เกษตรวิสัย,ร้อยเอ็ด",
+"22462-MBC วังสมบูรณ์,สระแก้ว",
+"22463-MBC บ้านหนองบัวแดง,เชียงราย",
+"22464-MBCหนองมะนาวทุ่งกราด,ชลบุรี",
+"22465-MBC ประชุมมิตร บ้านฉาง,ระยอง",
+"22466-BCM เชลล์หลังสวน,ชุมพร",
+"22467-MBC บ้านหัวฝาย,เชียงราย",
+"22468-BCM CTX พานทอง,ชลบุรี",
+"22469-MBC เอกทวีคูณ,สมุทรสาคร",
+"22470-MBC หนองผึ้ง,เชียงใหม่",
+"22471-MBC ตลาดนัดนาวง,นครศรีธรรมราช",
+"22472-BCM ศูนย์ราชการ,พะเยา",
+"22473-MBC ซำสูง, ขอนแก่น",
+"22474-MBC มัญจาคีรี, ขอนแก่น",
+"22475-MBC ตลาดจำเริญยนต์,ลำปาง",
+"22476-MBC กำปงตาโก๊ะ, นราธิวาส",
+"22477-ชุมชนตาดแคน,มุกดาหาร",
+"22478-MBC แลนด์มาร์ค, นครพนม",
+"22479-MBC ตลาดวังตาล, ลำพูน",
+"22480-BCM ชุมชนเนินพยอม,ระยอง",
+"22481-BCM เมืองแกน,เชียงใหม่",
+"22482-MBC หน้า มบ.แสนสราญ,เชียงใหม่",
+"22483-MBC หน้าปากน้ำ,ปัตตานี",
+"22484-BCM ชุมชนป่าก่อ,เชียงราย",
+"22485-BCM บ้านซ่อง,ฉะเชิงเทรา",
+"22486-MBC เทิง,เชียงราย",
+"22487-MBC ชนบท,ขอนแก่น",
+"22488-MBC พระซอง,นครพนม",
+"22489-MBC ละหานทราย,บุรีรัมย์",
+"22490-MBC ตลาดโต้รุ่ง หนองบอน,ระยอง",
+"22491-MBC ภูผาม่าน,ขอนแก่น",
+"22492-MBC เหล่านาดี,ขอนแก่น",
+"22493-MBC โนนสะอาด,อุดรธานี",
+"22494-BCM แม่ใจ,พะเยา",
+"22495-BCM บ้านปูยุด,ปัตตานี",
+"22496-ตลาดพงศ์ทรัพย์บางแก้ว,พัทลุง",
+"22497-BCM ชุมชนเชียงของ,เชียงราย",
+"22498-BCM นารถสุนทร,สมุทรปราการ",
+"22499-BCM BCP หนองใหญ่,ชลบุรี",
+"22500-เอื้ออาทรปราจีนบุรี,ปราจีนบุรี",
+"22501-MBC แม่ขะจาน,เชียงราย",
+"22502-ตลาดเทศบาลตำบลโคกสี,กาฬสินธุ์",
+"22503-BCM หนองกงฉาก,ชลบุรี",
+"22504-MBC ตลาดอุโมงค์,ลำพูน",
+"22505-BCM ถ.เกาะโพธิ์, ชลบุรี",
+"22506-BCM ตลาดท่าวังทอง,พะเยา",
+"22507-BCM เชียงคำ,พะเยา",
+"22508-BCM ปากน้ำโจ้โล้,ฉะเชิงเทรา",
+"22509-BCM แม่จัน,เชียงราย",
+"22510-MBC แม่ทะ,ลำปาง",
+"22511-BCM ถ.เฉลิมพงษ์,กรุงเทพฯ",
+"22512-BCM ชุมชนเกาะคา,ลำปาง",
+"22513-BCM ม.ราชมงคล คลอง 6,ปทุมธานี",
+"22514-ศูนย์ฯสิริกิติ์,กรุงเทพฯ",
+"22515-เลียบทางรถไฟ-ตลิ่งชัน,กรุงเทพฯ",
+"22516-BCM CTX ป่าอ้อดอนชัย,เชียงราย",
+"22517-BCM เทียนทะเล26,กรุงเทพฯ",
+"22518-BCM เบตงพลาซ่า,ยะลา",
+"22519-ลาดพร้าว 122 แยก24, กรุงเทพฯ",
+"22520-BCM ร.พ.บางปะกอก9, กรุงเทพฯ",
+"22521-BCM แว้ง, นราธิวาส",
+"22522-BCM อ.พร้าว, เชียงใหม่",
+"22523-BCM สระโคล่, พิษณุโลก",
+"22524-BCM อรัญญิก, พระนครศรีอยุธยา",
+"22525-BCM จันทร์ทองเอี่ยม,นนทบุรี",
+"22526-หมู่บ้านมังกรทอง,สิงห์บุรี",
+"22527-BCM ชุมชนเจ็ดยอด,เชียงใหม่",
+"22528-BCM เขาแก้ว,ลพบุรี",
+"22529-เฉลิมพระเกียรติ ซ.30,กรุงเทพฯ",
+"22530-BCM ชุมชนประตูม้า, ลำปาง",
+"22531-BCM ตลาดไนท์บาร์ซา,บุรีรัมย์",
+"22532-BCM กู่เต้า, เชียงใหม่",
+"22533-BCM วรุณนิเวศน์,เชียงใหม่",
+"22534-BCM ถนนจรัญยานนท์, ฉะเชิงเทรา",
+"22535-BCM ตลาดไทยสิริ3, อุดรธานี",
+"22536-BCM ซอยสุขเกษม7, เชียงใหม่",
+"22537-BCM เดว่าสิริโสธร,ฉะเชิงเทรา",
+"22538-BCM ถ.ชักพระ,กรุงเทพฯ",
+"22539-BCM หาดใหญ่บัสสเตชั่น,สงขลา",
+"22540-BCM ถ.ราษฎร์อุทิศ1, สงขลา",
+"22541-BCM ทุ่งขนาน,จันทบุรี",
+"22542-BCM ศรีธาตุ,ขอนแก่น",
+"22543-BCM ร.พ.กำแพงเพชร,กำแพงเพชร",
+"22544-เทศบาลพิมพา ซ.2,ฉะเชิงเทรา",
+"22545-BCM ต.พระธาตุบังพวน, หนองคาย",
+"22546-BCM พบพระ,ตาก",
+"22547-BCM สามัคคีธรรม, อุตรดิตถ์",
+"22548-BCM ขวัญเวียง,เชียงใหม่",
+"22549-BCM บ้านทุ่ม,ขอนแก่น",
+"22550-BCM พรานกระต่าย,กำแพงเพชร",
+"22551-BCM ถ.ดำริพัฒนา,พิษณุโลก",
+"22552-BCM BCP ดีเยี่ยม,อุบลราชธานี",
+"22553-BCM รามอินทรา 67,กรุงเทพฯ",
+"22554-BCM ท่าเรือบางรักสมุย",
+"22555-รพ.ธรรมศาสตร์เฉลิมพระเกียรติ",
+"22556-BCM ทุ่งสมอ,เพชรบูรณ์",
+"22557-BCM นายาวเขาค้อ,เพชรบูรณ์",
+"22558-BCM ภูทับเบิก,เพชรบูรณ์",
+"22559-BCM พาโนบางปะกง,ฉะเชิงเทรา",
+"22560-BCM ศรีโยธิน,กำแพงเพชร",
+"22561-BCM บ้านบ่อแร่, ภูเก็ต",
+"22562-BCM ซ.ไสยวน,ภูเก็ต",
+"22563-BCM คลองน้ำไหล,กำแพงเพชร",
+"22564-BCM ถ.มหาราช จันทบุรี",
+"22565-BCM ลับแล อุตรดิตถ์",
+"22566-BCM ท่าปลา,อุตรดิตถ์",
+"22567-BCM พัฒนาการ38 กรุงเทพฯ",
+"22568-BCM ถ.เจ้าฟ้าสวนหลวง ภูเก็ต",
+"22569-BCM ไทรม้า นนทบุรี",
+"22570-BCM อุทุมพรพิสัย ศรีสะเกษ",
+"22571-BCM โคกเมา สงขลา",
+"22572-BCM ถนนสนามบิน เชียงราย",
+"22573-BCM DC ธัญบุรีคลอง6 ปทุมธานี",
+"22574-BCM ชุมชนศรีชุม ลำปาง",
+"22575-แก้วอินทร์มาร์เก็ต นนทบุรี",
+"22576-BCM รามคำแหง 60 กรุงเทพฯ",
+"22577-BCM กาญจนาภิเษก ซ.4 กรุงเทพฯ",
+"22578-BCM งามวงศ์วาน25 นนทบุรี",
+"22579-BCM โรงพยาบาลน่าน น่าน",
+"22580-BCM หลังราชภัฏกำแพงเพชร",
+"22581-BCM บ้านแพง นครพนม",
+"22582-BCM ถ.มหายศ น่าน",
+"22583-BCM ถ.ข้าวหลาม ชลบุรี",
+"22584-BCM พุทธมณฑลสาย3 กรุงเทพฯ",
+"22585-ทุ่งศรีเมือง กาฬสินธุ์",
+"22586-งามสง่าโรจนะ ปราจีนบุรี",
+"22587-ตลาดพลอยแม่สอด ตาก",
+"22588-BCM เทศบาลบางปู60 สมุทรปราการ",
+"22589-BCM ตลาดเสรีไทย41 กรุงเทพฯ",
+"22590-ท่าข้ามบางปะกง ฉะเชิงเทรา",
+"22591-BCM ชุมชนบ้านดง ลำปาง",
+"22592-BCM ถ.อินทรคีรีแม่สอด ตาก",
+"22593-BCM ซ.บุณย์กัญจนาพัทยา ชลบุรี",
+"22594-BCM ถ.แหลมฉบังสาย1 ชลบุรี",
+"22595-BCM ตลาดสดเทศบาลตราด ตราด",
+"22596-BCM ตลาดกิเลน นครปฐม",
+"22597-BCM ซ.ยอดสเน่ห์1 ภูเก็ต",
+"22598-BCM เดอะวัน เชียงราย",
+"22599-BCM ตลาดบิ๊กมาร์เก็ต ชลบุรี",
+"22600-BCM อ.ท่าวังผา น่าน",
+"22601-บ้านคลองโขงเกาะลันตา กระบี่",
+"22602-BCM เวียงสา น่าน",
+"22603-BCM ดอนตะโก ราชบุรี",
+"22604-BCM บางโปรง สมุทรปราการ",
+"22605-BCM มิงเกิ้ล ฮิลล์ มีนบุรี",
+"22606-BCM ศรีมารัตน์ 26 ขอนแก่น",
+"22607-เฉวง-เชิงมนสมุย,สุราษฎร์ธานี",
+"22608-แยกบ่อนไก่-สมุย,สุราษฎร์ธานี",
+"22609-หลังมอ ซ.เรสซิเดนซ์ ขอนแก่น",
+"22610-BCM หนองหลอด ชัยภูมิ",
+"22611-BCM มหาวงษ์ สมุทรปราการ",
+"22612-BCM แลนซีโอคริปเพชรเกษม81",
+"22613-BCM บ.ลำแก่น พังงา",
+"22614-BCM คึกคัก พังงา",
+"22615-แอด บิ๊กซีเพลสรัชดา กรุงเทพฯ",
+"22616-BCM เขาสามยอด ลพบุรี",
+"22617-BCM บ้านท่าสองคอน มหาสารคาม",
+"22618-ถ.บางบ่อคลองด่าน สมุทรปราการ",
+"22619-บ่อผุดบีช-สมุย สุราษฎร์ธานี",
+"22620-BCM อ.ควนเนียง สงขลา",
+"22621-BCM เอื้ออาทรรัษฎา ภูเก็ต",
+"22622-BCM สุรานารีวิลล์ นครราชสีมา",
+"22623-BCM ซอยที่ดิน พัทยา ชลบุรี",
+"22624-BCM ตลาดราตรี มุกดาหาร",
+"22625-ถ.สร้างตนเอง 2 สุราษฎร์ธานี",
+"22626-BCM บ.ใต้-หาดริ้นเกาะพะงัน",
+"22627-บ.ใต้เกาะพะงัน สุราษฎร์ธานี",
+"22628-บางปอบีช สมุย สุราษฎร์ธานี",
+"22629-BCM กันทรลักษณ์ 2 ศรีสะเกษ",
+"22630-BCM บีงโขงหลง บึงกาฬ",
+"22631-BCM โนนชัย ขอนแก่น",
+"22632-BCM ม่อนแจ่ม เชียงใหม่",
+"22633-โกลเด้นเพลส สหพัฒน์ ชลบุรี",
+"22634-BCM บ้านแสงดาว น่าน",
+"22635-BCM บ้านฉลุง สตูล",
+"22636-BCM รักศักดิ์ชมูล22 จันทบุรี",
+"22637-BCM ถ.คลองหา สุราษฎร์ธานี",
+"22638-BCM บ้านนานอก ชลบุรี",
+"22639-ไลโอ สุขสวัสดิ์-ประชาอุทิศ 90",
+"22640-BCM ถ.หัวควนใต้ ภูเก็ต",
+"22641-อำเภอพรหมคีรี นครศรีธรรมราช",
+"22642-BCM หนองกี่ บุรีรัมย์",
+"22643-BCM บ้านบ่อวิน ชลบุรี",
+"22644-BCM ป่าแดด เชียงราย",
+"22645-BCM สุขุมวิท 115 สมุทรปราการ",
+"22646-BCM จี คอนโด ศรีราชา ชลบุรี",
+"22647-BCM กะรน ภูเก็ต",
+"22648-BCM หาดสุรินทร์ ภูเก็ต",
+"22649-ภูมิใจนิเวศน์ 10 สมุทรปราการ",
+"22650-BCM สวนสน ระยอง",
+"22651-BCM ถ.เทพอนุสรณ์ ภูเก็ต",
+"22652-BCM 30 กันยา ซ.2 นครราชสีมา",
+"22653-บ.มะเดื่อหวานเกาะพะงัน",
+"22654-BCM ศูนย์ราชการเกาะพะงัน",
+"22655-BCM บ.ศรีฐาน ขอนแก่น",
+"22656-BCM ถ.เทอดไท กรุงเทพฯ",
+"22657-ท่าเรือหัวเทียนเกาะพะงัน",
+"22658-BCM ถ.วิรัชหงษ์หยก ภูเก็ต",
+"22659-เคซีการ์เด้นท์โฮมนิมิตใหม่40",
+"22660-BCM คาลเท็กซ์ ห้าแยกพ่อขุน",
+"22661-BCM ชุมชนคลองแห สงขลา",
+"22662-BCM พัฒนาชนบท4 กรุงเทพฯ",
+"22663-BCM ถนนสวรรค์วิถี นครสวรรค์",
+"22664-BCM ถ.บางแสน สาย2 ชลบุรี",
+"22665-BCM ฝายหลวง อุตรดิตถ์",
+"22666-BCM ซ.มัยลาภ 2 กรุงเทพฯ",
+"22667-BCM ตลาดบ้านพอน ภูเก็ต",
+"22668-BCM ช่องจอม สุรินทร์",
+"22669-BCM ลอง แพร่",
+"22670-BCM วังกะพี้ อุดรดิตถ์",
+"22671-BCM สุทธิสาร กรุงเทพมหานคร",
+"22672-BCM อ.ห้างฉัตร ลำปาง",
+"22673-BCM บ้านติดต่อ เลย",
+"22674-BCM ชุมชนสอง แพร่",
+"22675-BCM ตลาดบ้านฝาง ขอนแก่น",
+"22676-BCM บางพระนครชัยศรี นครปฐม",
+"22677-BCM ชิค ชิค มาร์เก็ต หนองคาย",
+"22678-BCM ชุมชนแสงดาว พิษณุโลก",
+"22679-BCM ถ.ศรนรินทร์หาดใหญ่สงขลา",
+"22680-BCM ลำปางบัสสเตชั่น ลำปาง",
+"22681-BCM มหาวิทยาลัยธรรมศาสตร์",
+"22682-BCM นาดี ปราจีนบุรี",
+"22683-BCM หนองไผ่กลางดอน ชลบุรี",
+"22684-BCM เกาะสิเหร่ ภูเก็ต",
+"22685-BCM พระราม9 ซ.55 กรุงเทพฯ",
+"22686-BCM พระยาตรัง ซอย 7 จันทบุรี",
+"22687-BCM ถ.สหกรณ์ 3 เชียงใหม่",
+"22688-BCM เสนานิคม 1 กรุงเทพฯ",
+"22689-BCM หน้าค่ายบุรฉัตร ราชบุรี",
+"22690-บางแสน สาย 4 เหนือ 2 ชลบุรี",
+"22691-หนองขอน ทับใต้,ประจวบคีรีขันธ์",
+"22692-BCM ตลาดคลองสี่วาพาสวัสดิ์",
+"22693-BCM เมืองเก่า สุโขทัย",
+"22694-BCM ตลาดบ้านเสียว กาฬสินธุ์",
+"22695-BCM กระสัง, บุรีรัมย์",
+"22696-BCM BJC1",
+"22697-BCM วัน แบงค็อก",
+"22698-BCM พระแอะเกาะลันตา,กระบี่",
+"22699-หาดคลองดาว เกาะลันตา,กระบี่",
+"22700-BCMวันบัดเจท บายพาส,เชียงราย",
+"22701-BCM สามกอ, พระนครศรีอยุธยา",
+"22702-BCM ชุมชนโนนทัน3,ขอนแก่น",
+"22703-BCM บ้านเกาะ,พระนครศรีอยุธยา",
+"22704-BCM ภูเวียง2,ขอนแก่น",
+"22705-ถ.เกาะหลัก,ประจวบคีรีขันธ์",
+"22706-BCM ชุมชนศรีไค,อุบลราชธานี",
+"22707-BCM ถ.พัฒนา, ภูเก็ต",
+"22708-BCM ภูเก็ตแอร์พอร์ต,ภูเก็ต",
+"22709-BCMนิคมฯโรจนะ,พระนครศรีอยุธยา",
+"22710-BCM ถ.ศรีเวียง, เชียงราย",
+"22711-BCM ประชาอุทิศ76 ,กรุงเทพฯ",
+"22712-BCM เจริญนคร14, กรุงเทพฯ",
+"22713-BCM บางแวก 120,กรุงเทพฯ",
+"22714-BCM โคกเคียน,นราธิวาส",
+"22715-BCM เคหะดอนเมือง, กรุงเทพฯ",
+"22716-BCM TCCถ.กรุงเกษมระวีกัลยา",
+"22717-BCM ถ.ศุภสารรังสรรค์หาดใหญ่",
+"22718-BCM อ.หัวไทร,นครศรีธรรมราช",
+"22719-BCM TCC ฝั่งตรงข้าม ม.เกษตรฯ",
+"22720-BCM ชุมชนหนองหลุบ,ขอนแก่น",
+"22721-BCM แม่น้ำคู้ ซ.1,ระยอง",
+"22722-BCM อ่าวอุดม, ชลบุรี",
+"22723-BCM ถ.บ่อวิน ยางเอน,ชลบุรี",
+"22724-BCM เขามะกอก,ชลบุรี",
+"22725-วงเวียนรัถการหาดใหญ่, สงขลา",
+"22727-BCM TCC ลาดพร้าว48 แยก20",
+"22728-BCM บางกะดี่ 33,กรุงเทพฯ",
+"22729-BCMชุมชนเกาะเรียน,พระนครศรีฯ",
+"22730-BCM แม่น้ำคู้ ซ.2,ระยอง",
+"22731-BCM เอื้ออาทรอ้อยเตี้ย,นครปฐม",
+"22732-BCM อยู่วิทยา 12,กรุงเทพฯ",
+"22733-BCM บ้านบางโจ, ภูเก็ต",
+"22734-BCM เทพประสิทธิ์ 6 ซ.กอไผ่",
+"22735-BCM กานดาไอลีฟ, สมุทรสาคร",
+"22736-BCM TCC ลาดพร้าว132,กรุงเทพฯ",
+"22737-BCM พีที นิคมอุตสาหกรรมลำพูน",
+"22738-ถ.ทวีราษฏร์ภักดี บ.ใต้-สมุย",
+"22739-BCM บางแสนซ.14, ชลบุรี",
+"22740-BCM มิตรสัมพันธ์ ซ.3, ชลบุรี",
+"22741-หาดละไม 2สมุย, สุราษฎร์ธานี",
+"22742-หน้า รพ.นราธิวาสราชฯ,นราธิวาส",
+"22743-BCM ตลาดทิพย์นิมิตรบางพลี",
+"22744-BCM อ.เกาะสีชัง, ชลบุรี",
+"22745-BCM ชะอำบีช,เพชรบุรี",
+"22746-BCM บ้านบางแฟบ, สงขลา",
+"22747-BCM แจ้งวัฒนะ 6,กรุงเทพฯ",
+"22748-BCM ตลาดนัดเกาะแก้ว,ภูเก็ต",
+"22749-BCM รพ.สมเด็จพระปิ่นเกล้า",
+"22750-คลองหกตะวันออก12, ปทุมธานี",
+"22751-BCM วันบัดเจทป่ายาง,เชียงราย",
+"22752-BCM เดินเพลินวิลเลจ,อุดรธานี",
+"22753-ศุภาลัยนาเมือง,อุบลราชธานี",
+"22754-BCM TCC ถ.ช้างคลาน,เชียงใหม่",
+"22755-ซ.เพนียดช้างพัทยา ,ชลบุรี",
+"22756-BCM ตลาดบ้านกอก,ขอนแก่น",
+"22757-BCM วันบัทเจ็ด บายพาสตะวันตก",
+"22758-BCM สุขใจ 8,ประจวบคีรีขันธ์",
+"22759-BCM ชุมชนหนองใส,อุดรธานี",
+"22760-BCM ทศกัณฑ์-บางแวก,กรุงเทพฯ",
+"22761-BCM ชุมชนหนองไผ่,ขอนแก่น",
+"22763-BCM LPN พระราม3 - ริเวอร์ไรน์",
+"22764-BCM สันติธรรม,เชียงใหม่",
+"22765-BCM LPN ทาวน์ชิปรังสิต-คลอง1",
+"22766-BCM นามะเฟือง,หนองบัวลำภู",
+"22767-BCM มาบยางพร18, ระยอง",
+"22768-TCC ถ.เจริญประเทศ, เชียงใหม่",
+"22769-BCM TCC พัทยาสาย 2,ชลบุรี",
+"22770-สาขา ถ.เจริญประดิษฐ์ ซ.8",
+"22771-บางรักษ์บ่อนไก่, สุราษฎร์ธานี",
+"22772-BCM ถนนพรมแดน, กรุงเทพฯ",
+"22773-หนองหญ้างาม, นครราชสีมา",
+"22774-BCM บงกช 57, ปทุมธานี",
+"22775-BCM เอื้ออาทรรังสิตคลอง10/3",
+"22776-BCM รร.แอร์บัสแอดภาวนาสเตชั่น",
+"22779-BCM ไทยธานี 12, ปทุมธานี",
+"22780-BCM ศรีวิชัย26, สุราษฎร์ธานี",
+"22781-BCM ชุมชนท่าขอนยาง,มหาสารคาม",
+"22782-BCM ซอยตุ้มโฮม,ขอนแก่น",
+"22783-BCM สาขาบ้านปาลัส,ปัตตานี",
+"22784-BCM สุรนารี2, นครราชสีมา",
+"22785-BCM ชุมชนแม่ปะ,ตาก",
+"22786-BCM อ.ยางตลาด,กาฬสินธุ์",
+"22787-BCMตลาดแสงสังข์ทอง,กาฬสินธุ์",
+"22788-BCM หลังอุดรพิทย์, อุดรธานี",
+"22789-BCM ถ.ศรีเวียง,กรุงเทพฯ",
+"22790-BCM ดอมบม,ขอนแก่น",
+"22791-BCM บึงแสนสุข,นครราชสีมา",
+"22792-BCM บ.โคกนางาม,ขอนแก่น",
+"22793-BCM หลังราชภัฎสุรินทร์",
+"22794-BCM กระนวน,ขอนแก่น",
+"22795-BCM ซ.กุศลศิลป์2, กรุงเทพฯ",
+"22796-BCM สุขสวัสดิ์ 30, กรุงเทพฯ",
+"22797-BCM เพชรเกษม51 กรุงเทพฯ",
+"22798-BCM ซ.วิศวเสนานิคม,ราชบุรี",
+"22799-BCM สันผักหวาน,เชียงใหม่",
+"22800-BCM แยกพังกา, สุราษฎร์ธานี",
+"22801-BCM ชุมชนหนองจ๊อม,เชียงใหม่",
+"22802-BCM เคหะขามใหญ่,อุบลราชธานี",
+"22803-BCM บ้านตลาด, นครราชสีมา",
+"22804-เอื้ออาทรหัวทะเล, นครราชสีมา",
+"22805-BCM มบ.มิราเคิลประชาอุทิศ 90",
+"22806-BCM เอื้ออาทรไร่กล้วย, ชลบุรี",
+"22807-BCM ตำบลคูเต่า, สงขลา",
+"22808-ซ.หมื่นประยูรคลองภาษีเจริญ",
+"22809-BCM ถ.สหกรณ์1, เชียงใหม่",
+"22810-ถ.หัวดอน, ประจวบคีรีขันธ์",
+"22811-BCM คลองดินดำ, นครราชสีมา",
+"22812-BCM บางขุนเทียน 16,กรุงเทพฯ",
+"22813-BCM วิลาจจิโอทรัพย์พัฒนา",
+"22814-เฉลิมพระเกียรติ 48, กรุงเทพฯ",
+"22815-BCM ถ.หน้าสงเคราะห์, ปัตตานี",
+"22816-BCM อนรรฆนาค 17,กาฬสินธุ์",
+"22817-คลองปีกนกท่าทราย,สมุทรสาคร",
+"22818-BCM ซ.นวลจันทร์56, กรุงเทพฯ",
+"22819-วัดทองธรรมิการาม, สมุทรสาคร",
+"22820-BCM สี่แยกกองทราย, เชียงใหม่",
+"22821-BCM ลำลูกกา223, ปทุมธานี",
+"22822-BCM หาดลิปะน้อยสมุย",
+"22823-BCM ชากค้อ-หนองขาม, ชลบุรี",
+"22824-BCM ถ.เอราวัณ1, ปทุมธานี",
+"22825-BCM ถ.เทพกระษัตรี, ภูเก็ต",
+"22826-BCMวงเวียนบ้านไร่,นครราชสีมา",
+"22827-BCM ควนลัง,สงขลา",
+"22828-รามคำแหง 52/2,กรุงเทพมหานคร",
+"31001-FC เดอะสเตชั่น-สมุทรสาคร",
+"31002-FC CTX สระบุรี ขาเข้า",
+"31007-FC ปักธงชัย โคราช",
+"31010-FC CTX แอร์พอร์ตเชียงใหม่",
+"31011-FC CTX โนนสะอาด อุดรธานี",
+"31012-FC CTX หนองหาน อุดรธานี",
+"31013-FC ตลาดถนอมมิตร วัชรพล",
+"31016-FC ชุมแพ ขอนแก่น",
+"31017-FC CTX ปากช่อง โคราช",
+"31020-FC CTX ศรีธาตุ อุดรธานี",
+"31023-FC เนโกะปาร์ค ลาดกระบัง",
+"31025-FC เดอะเกรท ซ.วัดลาดปลาดุก",
+"31026-FC BCP ไชยสอ ขอนแก่น",
+"31027-FC ปากช่อง 15",
+"31028-FC อรัญประเทศ สระแก้ว",
+"31029-FC  สีชมพู ขอนแก่น",
+"31032-FC หนองบัวแดง อุดรธานี",
+"31033-FC หน้าโรงเรียน จปร.นครนายก",
+"31035-MFC หนองสาหร่าย",
+"31037-FC ตึกคอม อุดรธานี",
+"31038-FC CTX สันกำแพง",
+"31039-FC เดอะแคนนาส",
+"31042-FC BCP หนองไผ่ ขอนแก่น",
+"31044-FC Shell นิคมสุรนารี",
+"31045-FC เลียบคลอง3_2",
+"31049-MFC เชลล์ บ้านนาสาร",
+"31050-FC Esso ท่าฉาง",
+"31051-FC Shell ท่าชนะ",
+"31052-FC Shell วชิรบารมี",
+"31053-FC พรหมประกาย ซ.11",
+"31055-MFCโรงเรียนนานาชาติธาราพัฒนา",
+"31056-FC CTX พระราม 2 กม.54 ขาออก",
+"31057-FC Shell ปลวกแดง ระยอง",
+"31059-FC Esso สะเดา",
+"31060-FC ม.เกษตร กำแพงแสน",
+"31061-FC CTX บายพาส 2 สกลนคร",
+"31062-FC CTX โพนยางคำ สกลนคร",
+"31063-FC Esso ขลุง จันทบุรี ขาออก",
+"31065-FC CTX บายพาส 1 สกลนคร",
+"31066-FC CTX ห้วยทราย สกลนคร",
+"31067-FC BCP คอนสาร",
+"31069-FC CTX วังสามหมอ",
+"31070-FC โพธิวราราม",
+"31072-FC CTXมอเตอร์เวย์ กม.99ขาเข้า",
+"31073-FC Shell นครศรีธรรมราช",
+"31076-MFC แก่งคอย",
+"31078-FC Shellมิตรภาพ กม.140 ขาเข้า",
+"31079-FC เทคนิคอุดรธานี",
+"31080-FC บ้านโป่ง ราชบุรี",
+"31081-FC ถนนมาลัยแมน",
+"31087-FC BCP ชุมแพ ชัยภูมิ",
+"31088-FC CTX บ้านไผ่ ขอนแก่น",
+"31089-BCM FC CTX เมืองพล ขอนแก่น",
+"31090-BCM FC หนองหาน2 อุดรธานี",
+"31091-BCM FC CTX นากลาง หนองบัวลำพู",
+"31092-BCM FC BCP บายพาส ปราณบุรี",
+"31093-FC BCP สุวินทวงศ์ ฉะเชิงเทรา",
+"31094-BCM FC Shell หลังสวน 2 ชุมพร",
+"31095-BCM FC BCP ห้วยยาง",
+"31096-BCM FC BCP ฮาบิแทท มอลล์",
+"31097-BCM FC BCP พระใหญ่, ชุมพร",
+"31098-BCM FC BCP กมลาไสย-กาฬสินธุ์",
+"31099-BCM FC BCP ถ.กบินทร์บุรี",
+"31100-BCM FC BCP เขาปีบ ชุมพร",
+"31101-BCM FC BCP บ้านพระ,ปราจีนบุรี",
+"31102-FC BCP อนุภาษ ไม้ขาว, ภูเก็ต",
+"31103-FC BCP หลักจันทร์,จันทบุรี",
+"31104-BCM FC เกาะไร่, ฉะเชิงเทรา",
+"31105-BCM FC BCP โคกกรวด,นครราชสีมา",
+"31106-BCM FC BCP สำโรงทาบ,สุรินทร์",
+"31107-BCM FC BCP นาหม่อม, สงขลา",
+"31108-BCM FC กมลาไสย, กาฬสินธุ์",
+"31109-BCM FC BCP สนามบินกระบี่",
+"31110-BCM FC BCP วังสะพุง, เลย",
+"31111-FC BCPท่าโรงช้าง,สุราษฎร์ธานี",
+"31112-FC BCP บ.นาสาร,สุราษฎร์ธานี",
+"31113-BCM FC BCP เขาไชยราช,ชุมพร",
+"31114-BCM FC โนนสมบูรณ์ ,บึงกาฬ",
+"31115-BCM FC BCP กำแพงแสน,นครปฐม",
+"31116-BCM FC เดอะวันพลัสแปลงยาว",
+"31117-BCM FC BCP ถ.สระบุรี-หล่มสัก",
+"31118-BCM FC BCP นิคมพัฒนา, ระยอง",
+"31119-BCM FC แก้งคร้อ, ชัยภูมิ",
+"31120-FC เลอ ชาโมนิกซ์, เชียงใหม่",
+"31121-BCM FC BCP หนองหอย,เชียงใหม่",
+"31122-FC BCP บางบ่อ, สมุทรปราการ",
+"31123-FC BCP หน้าสนามกีฬาเทศบาล",
+"31124-BCM FC BCP คลองสวนพลู,อยุธยา",
+"31125-BCM FC BCP เปลี่ยน-สิชล",
+"31126-BCM FC BCP วังมะนาว,เพชรบุรี",
+"31127-FC BCP โตนด–โนนสูง,นครราชสีมา",
+"31128-FC BCP บางนา กม.27,ขาเข้า",
+"31129-BCM FC ตลาดเครังสิต,ปทุมธานี",
+"31130-BCM FC BCP อ่อนนุช ขาเข้า",
+"31131-FC BCP บางปู ยะหริ่ง,ปัตตานี",
+"31132-BCM FC BCP ยะหา, ยะลา",
+"31133-FC BCP บายพาสปราณบุรี ขาออก",
+"31134-BCM FC หลังตลาดสดชุมพร,ชุมพร",
+"31135-FC โรงพยาบาลนางรอง,บุรีรัมย์",
+"31136-BCM FC ท่าตะโก,นครสวรรค์",
+"31137-FC BCP เอสเคพี พาวเวอร์,เลย",
+"31138-BCM FC BCP กาญจนทรัพย์",
+"31139-BCM FC BCP ดุสิตา, สระบุรี",
+"31140-BCM FC BCP เซ็นทรัลสุราษฎร์",
+"31141-BCM FC ชอร์วิบูลย์เซกา,บึงกาฬ",
+"31142-BCM FC BCP เวียงเชียงรุ้ง",
+"31143-FC ถ.สฤษดิ์วงศ์ สุไหงโก-ลก",
+"31144-BCM FC BCP นิคมพัฒนา 2,ระยอง",
+"31145-BCM FC BCP สหกรณ์ดอยสะเก็ด",
+"41001-สาขาที่ 3",
+"41002-วารินชำราบ",
+"41003-สุขสวัสดิ์",
+"41005-สำโรง",
+"41006-ธนบุรี-ปากท่อ",
+"41007-โคราช",
+"41008-อุดรธานี",
+"41009-ขอนแก่น",
+"41010-เชียงราย",
+"41011-พิษณุโลก",
+"41012-นครสวรรค์",
+"41013-ติวานนท์",
+"41014-สาขามหาชัย",
+"41015-กำแพงเพชร",
+"41016-สะพานควาย",
+"41017-หางดง",
+"41018-ลำปาง",
+"41019-สระบุรี",
+"41020-ลพบุรี",
+"41021-นครปฐม",
+"41022-อ้อมใหญ่",
+"41023-ระยอง",
+"41024-บางพลี",
+"41025-ภูเก็ต",
+"41026-หาดใหญ่",
+"41027-อุบลราชธานี",
+"41028-พังงา",
+"41029-แหลมทอง",
+"41030-เชียงใหม่",
+"41031-ราชดำริ 2",
+"41032-ดาวคะนอง",
+"41033-แจ้งวัฒนะ",
+"41034-ราชบุรี",
+"41035-เพชรบุรี",
+"41036-สุราษฎร์ธานี",
+"41037-สมุทรปราการ",
+"41038-บางนา",
+"41039-ดอนเมือง",
+"41040-ลำลูกกา",
+"41041-ชลบุรี",
+"41042-พัทยา2",
+"41043-หล่มสัก",
+"41046-สวนหลวง",
+"41047-ประชาอุทิศ",
+"41048-บ้านบึง",
+"41049-เทพกษัตรีย์",
+"41053-Pure กมลา",
+"41056-แจ้งวัฒนะ2",
+"41057-Pure เมกาบางนา",
+"41058-PURE ฉะเชิงเทรา",
+"41060-Pure พิบูลมังสาหาร",
+"41061-PURE ยโสธร",
+"41062-PURE ศรีสะเกษ",
+"41063-PURE สุรินทร์",
+"41064-PURE บุรีรัมย์",
+"41066-PURE มหาสารคาม",
+"41067-PURE ชัยภูมิ",
+"41069-PURE ลำพูน",
+"41070-อยุธยา",
+"41071-รังสิตคลองหก",
+"41072-กระบี่",
+"41073-เลย",
+"41074-เคหะร่มเกล้า",
+"41075-สตูล",
+"41076-หทัยราษฎร์",
+"41079-มุกดาหาร",
+"41080-ลาดพร้าว",
+"41081-สกลนคร",
+"41082-สระแก้ว",
+"41084-คู้บอน",
+"41085-สุวินทวงศ์",
+"41086-แพร่",
+"41087-สุโขทัย",
+"41088-พัทยา",
+"41092-ร้อยเอ็ด",
+"41093-เพชรบูรณ์",
+"41095-PURE อำนาจเจริญ",
+"41096-PURE หัวหิน",
+"41097-ชลบุรี 3 เซ็นทรัล",
+"41102-รัตนาธิเบศร์ 2",
+"41103-สุขาภิบาล 3",
+"41105-อ่างทอง",
+"41106-สาขาสมุย",
+"41107-สุขาภิบาล 5",
+"41108-สายไหม",
+"41109-เกาะพะงัน",
+"41110-ตาก",
+"41112-กาฬสินธุ์",
+"41113-พัทยา 3",
+"41114-แฟชั่นไอซ์แลนด์",
+"41115-สมุทรสงคราม",
+"41119-สาขาลาดพร้าว 2",
+"41120-สุพรรณบุรี",
+"41126-สาขาเอกมัย",
+"41129-ตรัง",
+"41133-นครพนม",
+"41134-กาญจนบุรี",
+"41135-สาขาบางปะกอก",
+"41136-กัลปพฤกษ์",
+"41137-ศรีมหาโพธิ",
+"41139-รามอินทรา",
+"41141-ร่มเกล้า",
+"41142-บางบอน",
+"41143-หาดใหญ่ 2",
+"41144-เพชรเกษม 2",
+"41145-อิสรภาพ",
+"41146-อ่อนนุช",
+"41153-สาขาบางใหญ่",
+"41154-สาขาฉะเชิงเทรา 2",
+"41155-เชียงใหม่ 2",
+"41156-สาขาพระราม 4",
+"41157-สาขารัชดาภิเษก",
+"41158-สีคิ้ว",
+"41159-น่าน",
+"41165-กระนวน",
+"41166-Pure เพชรเกษม",
+"41167-Pure หัวหมาก",
+"41170-Pure สำโรง2",
+"41171-Pure ระนอง",
+"41172-Pure ภูเก็ต2",
+"41173-Pure อรัญประเทศ",
+"41174-Pure โคราช 2",
+"41175-Pure ปทุมธานี",
+"41176-Pure สัตหีบ",
+"41177-Pure ราชดำริ 3",
+"41178-เกตเวย์บางโพบางซื่อ",
+"41179-PURE นครศรีธรรมราช",
+"41180-PURE เชียงราย 2",
+"41181-PURE สาขาพัทยา1_2",
+"41182-PURE สามย่านมิตรทาวน์",
+"41183-PURE ขอนแก่น 2",
+"41184-PURE ไทรน้อย",
+"41185-PURE ปากช่อง",
+"41186-PURE ท่าอิฐ",
+"41187-PURE หนามแดง",
+"41188-PURE มหาชัย2",
+"41189-PURE บ่อวิน",
+"41190-PURE นราธิวาส",
+"41191-PURE พันธุ์ทิพย์ งามวงศ์วาน",
+"41192-PURE สุไหงโก-ลก,นราธิวาส",
+"41193-PURE ไฮเปอร์ สระบุรี",
+"41194-Pure รัชดาภิเษก2",
+"41195-PURE รังสิต คลอง 3",
+"41196-PURE ยะลา",
+"41197-PURE ปัตตานี",
+"41198-PURE เอเชียทีค",
+"41199-PURE พันธุ์ทิพย์ เชียงใหม่",
+"41200-PURE วัน แบงค๊อก ,กรุงเทพฯ",
+"41201-PURE หัวหิน มาร์เช่",
+"41202-PURE ปาร์ค บางนา",
+"41203-PURE ดิ โอลด์ สยาม",
+"41204-PURE วงศ์สว่าง",
+"41206-PURE ฟีนิกซ์",
+"61001-โบลาเวน_บิ๊กซีเอ็กซ์ตร้าพระราม4",
+"61003-โบลาเวน_บิ๊กซีราชดำริ ชั้น6",
+"62001-วาวี บิ๊กซีราชดำริ ชั้น 2",
+"62002-โรงคั่ว",
+"62003-ท่ากระดาษริมเหมืองคลัง",
+"62004-วาวี ท่ากระดาษริมเหมือง",
+"62005-แอดเคิร์ฟ",
+"62006-เจ เจ มาร์เก็ต",
+"62007-ศรีดอนไชย",
+"62008-วาวี สนามบินเชียงใหม่ ชั้น 1",
+"62009-วาวี กลางเวียง",
+"62010-วาวี กาดหลวง",
+"62011-วาวี บิ๊กซีราชดำริ ชั้น 6",
+"62012-วาวี บิ๊กซีสุขาภิบาล 5",
+"62014-วาวี ศูนย์ฯสิริกิติ์,กรุงเทพฯ",
+"63001-วาวี คีออส บิ๊กซีราชดำริ ชั้น 1",
+"63002-วาวี คีออส บิ๊กซีสุขสวัสดิ์ ชั้น 1",
+"63003-วาวี คีออส บิ๊กซีบางพลี",
+"63004-วาวี คีออส บิ๊กซีนครปฐม",
+"63005-วาวี คีออส บิ๊กซีแจ้งวัฒนะ 1",
+"63006-วาวี คีออส บิ๊กซีสะพานควาย",
+"63007-วาวี คีออส บิ๊กซีอัอมใหญ่",
+"63008-วาวี คีออส บิ๊กซีสามย่านมิตรทาวน์",
+"63009-วาวี คีออส บิ๊กซีรังสิต1",
+"63010-วาวี คีออส บิ๊กซีแจ้งวัฒนะ 2",
+"63011-วาวี คีออส บิ๊กซีพระราม 2",
+"63012-วาวี คีออส บิ๊กซีติวานนท์",
+"63013-วาวี คีออส บิ๊กซีรัชดา",
+"63014-วาวี คีออส บิ๊กซีบางนา",
+"63015-วาวี คีออส บิ๊กซีพระราม 4",
+"63016-วาวี คีออส บิ๊กซีสมุทรปราการ",
+"63017-วาวี คีออส บิ๊กซีแฟชั่นไอส์แลนด์",
+"63018-วาวี คีออส บิ๊กซีสำโรง 2",
+"63019-วาวี คีออส บิ๊กซีอ่อนนุช",
+"63020-วาวี คีออส บิ๊กซีเชียงใหม่ 1",
+"63021-วาวี คีออส บิ๊กซีเพชรเกษม 2",
+"63023-วาวี คีออส บิ๊กซีหัวหมาก",
+"63024-วาวี คีออส บิ๊กซีเชียงราย 1",
+"63025-วาวี คีออส บิ๊กซีเชียงราย 2",
+"63026-วาวี คีออส บิ๊กซีบางใหญ่",
+"63028-วาวี คีออส บิ๊กซีลาดพร้าว 1",
+"63029-วาวี คีออส บิ๊กซีกัลปพฤกษ์",
+"63030-วาวี คีออส สุขาภิบาล 3",
+"63031-วาวี คีออส บิ๊กซีลาดพร้าว 2",
+"63032-วาวี คีออส ดอนเมือง",
+"63033-วาวี คีออส บางบอน",
+"63034-วาวี คีออส บิ๊กซีท่าอิฐ",
+"63035-วาวี คีออส บิ๊กซีหนามแดง",
+"63037-วาวี คีออส บิ๊กซีสุวิททวงศ์",
+"63038-วาวี บุ๊คคาเฟ่ เซ็นทรัลเวิล์ด",
+"63039-วาวี คีออส บิ๊กซี พัทยา2",
+"63041-วาวี คีออส บิ๊กซี พระราม2 ฟู้ดคอร์ท",
+"63042-วาวี คีออส บิ๊กซีดาวคะนอง",
+"63049-วาวี ท่าอากาศยานสุวรรณภูมิชั้น B1",
+"65001-วาวี คอนเทนเนอร์ โรงพยาบาลลำพูน",
+"65002-วาวี คอนเทนเนอร์ บิ๊กซีลาดพร้าว 2",
+"65003-วาวี ม.เทคโนโลยีราชมงคลกรุงเทพ",
+"65004-วาวี คอนเทนเนอร์ บิ๊กซี มหาชัย2",
+"65005-วาวี สถาบันบัณฑิตพัฒนศิลป์ ศาลายา",
+"65006-วาวี คอนเทนเนอร์ บิ๊กซีพระราม2 เรส",
+"65007-วาวีคอนเทนเนอร์ ออฟฟิศ บิ๊กซี ชั้นB",
+"65008-วาวีคอนเทนเนอร์ ออฟฟิศ บิ๊กซี ชั้นG",
+"65009-วาวี ออฟฟิศ บีเจซี2 ชั้น จี",
+"65010-วาวี พันธุ์ทิพย์ งามวงศ์วาน",
+"65011-วาวีคอนเทนเนอร์ ราชดำริห์ ชั้น 2"
+                ],
+
+                validUsers: {
+                    'admin': '1234',
+                    'staff': 'password',
+                    'area15': 'area15',
+                    'area16': 'area16',
+                    'area18': 'area18'
+                },
+
+                userWarehouses: {
+                    'area15': ['11169-อำนาจเจริญ'],
+                    'area16': ['11167-ศรีสะเกษ'],
+                    'area18': ['11233-โคราช 2', '11124-อุบลราชธานี']
+                },
+
+                currentTab: 'dashboard',
+                searchQuery: '',
+                
+                currentPage: 1,
+                itemsPerPage: 10,
+
+                // Bulk Selection Variable
+                selectedAssets: [],
+
+                showModal: false,
+                showDeleteModal: false,
+                showBulkDeleteModal: false,
+                showUserModal: false,
+                showUserDeleteModal: false,
+                showImportModal: false,
+                showImportResultModal: false,
+                showImportErrorModal: false,
+                showValidationWarningModal: false,
+                missingRequiredFields: [],
+                showClearLogModal: false,
+                logCurrentPage: 1,
+                logItemsPerPage: 20,
+                importSuccessCount: 0,
+                isEditMode: false,
+                isUserEditMode: false,
+                editIndex: null,
+                itemToDelete: null,
+                userToDelete: null,
+                userForm: { username: '', password: '', warehouses: [] },
+                userFormError: '',
+                importPreviewData: { newRows: [], duplicateSerials: [] },
+                
+                columns: [
+                    'Asset Code', 'Asset Name', 'Asset Type ID', 'Asset Description', 
+                    'Serial No', 'Tag Barcode', 'Branch Code', 'Product ID', 
+                    'Seller Supplier Code', 'Service Supplier Code', 'Start Warranty Date', 
+                    'End Warranty Date', 'Status', 'Purchase Order No', 
+                    'Operation Device Status', 'Location', 'Remark', 'Asset Number', 
+                    'Asset Type', 'Warehouse', 'Action', 'Transfer / Use'
+                ],
+                assets: [],
+                auditLogs: [],
+                form: {},
+                dbStatus: 'connecting', // 'connecting' | 'online' | 'offline'
+
+                init() {
+                    const sessionUser = sessionStorage.getItem('it_asset_logged_user');
+                    if (sessionUser) {
+                        this.isLoggedIn = true;
+                        this.currentUser = sessionUser;
+                    }
+                    this.resetForm();
+                    this.initFirebase();
+                },
+
+                // ค่าเริ่มต้น (seed) ใช้ครั้งแรกเท่านั้น กรณีที่ยังไม่เคยมีข้อมูลใน Firebase เลย
+                getDefaultAssets() {
+                    return [{
+                        'Asset Code': 'AST-001', 'Asset Name': 'Dell Latitude 5420', 'Asset Type ID': 'LP-01',
+                        'Asset Description': 'Core i5 11th Gen, 16GB RAM', 'Serial No': 'DL998231',
+                        'Tag Barcode': 'TB-55412', 'Branch Code': 'HQ', 'Product ID': 'PRD-DELL-01',
+                        'Seller Supplier Code': 'SUP-01', 'Service Supplier Code': 'SUP-02',
+                        'Start Warranty Date': '2024-01-10', 'End Warranty Date': '2027-01-10',
+                        'Status': 'Active', 'Purchase Order No': 'PO-2024-001',
+                        'Operation Device Status': 'Good', 'Location': 'Floor 3 Room A',
+                        'Remark': 'Assigned to Staff', 'Asset Number': 'A-0001',
+                        'Asset Type': 'Laptop', 'Warehouse': '11109-อุดรธานี', 'Action': 'Deploy', 'Transfer / Use': 'In Use'
+                    }, {
+                        'Asset Code': 'AST-002', 'Asset Name': 'HP ProBook 450', 'Asset Type ID': 'LP-02',
+                        'Asset Description': 'Core i7, 16GB RAM', 'Serial No': 'HP123456',
+                        'Tag Barcode': 'TB-88991', 'Branch Code': 'AMN', 'Product ID': 'PRD-HP-02',
+                        'Seller Supplier Code': 'SUP-01', 'Service Supplier Code': 'SUP-02',
+                        'Start Warranty Date': '2024-02-01', 'End Warranty Date': '2027-02-01',
+                        'Status': 'Active', 'Purchase Order No': 'PO-2024-002',
+                        'Operation Device Status': 'Good', 'Location': 'Hub Office',
+                        'Remark': 'Amnat Project', 'Asset Number': 'A-0002',
+                        'Asset Type': 'Laptop', 'Warehouse': '11169-อำนาจเจริญ', 'Action': 'Deploy', 'Transfer / Use': '11101-(สาขาวงศ์สว่าง)'
+                    }];
+                },
+
+                initFirebase() {
+                    // สถานะการเชื่อมต่อ Realtime Database
+                    db.ref('.info/connected').on('value', (snap) => {
+                        this.dbStatus = snap.val() === true ? 'online' : 'offline';
+                    });
+
+                    // seed ข้อมูลเริ่มต้นเฉพาะครั้งแรกที่ยังไม่มีข้อมูลใน Firebase เลย
+                    db.ref('assets').once('value').then((snap) => {
+                        if (!snap.exists()) {
+                            db.ref('assets').set(this.getDefaultAssets());
+                        }
+                    });
+                    db.ref('users/validUsers').once('value').then((snap) => {
+                        if (!snap.exists()) {
+                            db.ref('users/validUsers').set(this.validUsers);
+                        }
+                    });
+                    db.ref('users/userWarehouses').once('value').then((snap) => {
+                        if (!snap.exists()) {
+                            db.ref('users/userWarehouses').set(this.userWarehouses);
+                        }
+                    });
+
+                    // ฟังการเปลี่ยนแปลงข้อมูลแบบเรียลไทม์
+                    db.ref('assets').on('value', (snap) => {
+                        const val = snap.val();
+                        this.assets = val ? (Array.isArray(val) ? val : Object.values(val)) : [];
+                    });
+                    db.ref('users/validUsers').on('value', (snap) => {
+                        const val = snap.val();
+                        if (val) this.validUsers = val;
+                    });
+                    db.ref('users/userWarehouses').on('value', (snap) => {
+                        this.userWarehouses = snap.val() || {};
+                    });
+                    db.ref('logs').on('value', (snap) => {
+                        const val = snap.val();
+                        this.auditLogs = val ? (Array.isArray(val) ? val : Object.values(val)) : [];
+                    });
+                },
+
+                saveUsersToStorage() {
+                    db.ref('users/validUsers').set(this.validUsers);
+                    db.ref('users/userWarehouses').set(this.userWarehouses);
+                },
+
+                logAction(actionType, serialNo, detailText) {
+                    const now = new Date();
+                    const timestamp = now.toLocaleString('th-TH', { 
+                        year: 'numeric', month: '2-digit', day: '2-digit', 
+                        hour: '2-digit', minute: '2-digit', second: '2-digit' 
+                    });
+                    
+                    const newLog = {
+                        timestamp: timestamp,
+                        user: this.currentUser || 'system',
+                        action: actionType,
+                        serialNo: serialNo || '-',
+                        detail: detailText
+                    };
+
+                    this.auditLogs.unshift(newLog);
+                    if (this.auditLogs.length > 50) this.auditLogs.pop();
+                    db.ref('logs').set(this.auditLogs);
+                    this.logCurrentPage = 1;
+                },
+
+                changeLogPage(page) {
+                    if (page >= 1 && page <= this.totalLogPages) {
+                        this.logCurrentPage = page;
+                    }
+                },
+
+                confirmClearLogs() {
+                    this.showClearLogModal = true;
+                },
+
+                clearLogs() {
+                    this.auditLogs = [];
+                    db.ref('logs').remove();
+                    this.logCurrentPage = 1;
+                    this.showClearLogModal = false;
+                },
+
+                getHeaderTitle() {
+                    if (this.currentTab === 'dashboard') return 'Dashboard Overview';
+                    if (this.currentTab === 'assets') return 'IT Asset Manifest Data';
+                    if (this.currentTab === 'users' && this.currentUser === 'admin') return 'User & Warehouse Settings';
+                    return '';
+                },
+
+                login() {
+                    let u = this.loginForm.username.trim();
+                    let p = this.loginForm.password.trim();
+
+                    if (this.validUsers[u] && this.validUsers[u] === p) {
+                        this.isLoggedIn = true;
+                        this.currentUser = u;
+                        this.loginError = '';
+                        sessionStorage.setItem('it_asset_logged_user', u);
+                        this.loginForm = { username: '', password: '' };
+                        this.selectedAssets = [];
+                    } else {
+                        this.loginError = 'ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง';
+                    }
+                },
+
+                logout() {
+                    this.isLoggedIn = false;
+                    this.currentUser = '';
+                    this.selectedAssets = [];
+                    sessionStorage.removeItem('it_asset_logged_user');
+                },
+
+                resetForm() {
+                    this.form = {};
+                    this.columns.forEach(col => this.form[col] = '');
+                },
+
+                saveToStorage() {
+                    if (this.assets.length === 0) {
+                        db.ref('assets').remove();
+                    } else {
+                        db.ref('assets').set(this.assets);
+                    }
+                },
+
+                get filteredAssets() {
+                    let allowedWarehouses = this.userWarehouses[this.currentUser];
+                    let list = this.assets;
+                    
+                    if (allowedWarehouses && Array.isArray(allowedWarehouses) && allowedWarehouses.length > 0) {
+                        list = list.filter(item => allowedWarehouses.includes(item['Warehouse']));
+                    }
+
+                    if (!this.searchQuery) return list;
+                    const q = this.searchQuery.toLowerCase();
+                    return list.filter(item => {
+                        return Object.values(item).some(val => String(val).toLowerCase().includes(q));
+                    });
+                },
+
+                get totalPages() {
+                    return Math.ceil(this.filteredAssets.length / this.itemsPerPage);
+                },
+
+                get paginatedAssets() {
+                    let start = (this.currentPage - 1) * this.itemsPerPage;
+                    let end = start + this.itemsPerPage;
+                    return this.filteredAssets.slice(start, end);
+                },
+
+                get totalLogPages() {
+                    return Math.ceil(this.auditLogs.length / this.logItemsPerPage);
+                },
+
+                get paginatedLogs() {
+                    let start = (this.logCurrentPage - 1) * this.logItemsPerPage;
+                    let end = start + this.logItemsPerPage;
+                    return this.auditLogs.slice(start, end);
+                },
+
+                get isAllSelected() {
+                    let pageItems = this.paginatedAssets;
+                    if (pageItems.length === 0) return false;
+                    return pageItems.every(item => this.selectedAssets.includes(item));
+                },
+
+                toggleSelectAll() {
+                    let pageItems = this.paginatedAssets;
+                    if (this.isAllSelected) {
+                        this.selectedAssets = this.selectedAssets.filter(item => !pageItems.includes(item));
+                    } else {
+                        pageItems.forEach(item => {
+                            if (!this.selectedAssets.includes(item)) {
+                                this.selectedAssets.push(item);
+                            }
+                        });
+                    }
+                },
+
+                toggleSelectAsset(item) {
+                    if (this.selectedAssets.includes(item)) {
+                        this.selectedAssets = this.selectedAssets.filter(a => a !== item);
+                    } else {
+                        this.selectedAssets.push(item);
+                    }
+                },
+
+                changePage(page) {
+                    if (page >= 1 && page <= this.totalPages) {
+                        this.currentPage = page;
+                    }
+                },
+
+                openModal() {
+                    this.isEditMode = false;
+                    this.resetForm();
+                    this.showModal = true;
+                },
+
+                editAsset(item) {
+                    this.isEditMode = true;
+                    this.editIndex = this.assets.findIndex(a => a === item);
+                    this.form = { ...item };
+                    this.showModal = true;
+                },
+
+                saveAsset() {
+                    // ตรวจสอบว่าช่อง Warehouse และ Serial No ว่างหรือไม่ (ถ้าว่างให้แสดง Popup แจ้งเตือนสวยงาม)
+                    let missing = [];
+                    if (!this.form['Warehouse'] || this.form['Warehouse'].trim() === '') {
+                        missing.push('Warehouse');
+                    }
+                    if (!this.form['Serial No'] || this.form['Serial No'].trim() === '') {
+                        missing.push('Serial No');
+                    }
+                    if (missing.length > 0) {
+                        this.missingRequiredFields = missing;
+                        this.showValidationWarningModal = true;
+                        return;
+                    }
+
+                    let serialNo = this.form['Serial No'] || 'N/A';
+                    let assetName = this.form['Asset Name'] || '';
+
+                    if (this.isEditMode) {
+                        this.assets[this.editIndex] = { ...this.form };
+                        this.logAction('EDIT', serialNo, `แก้ไขข้อมูลทรัพย์สิน: ${assetName}`);
+                    } else {
+                        this.assets.unshift({ ...this.form });
+                        this.logAction('ADD', serialNo, `เพิ่มทรัพย์สินใหม่: ${assetName}`);
+                    }
+                    this.saveToStorage();
+                    this.showModal = false;
+                },
+
+                confirmDelete(item) {
+                    this.itemToDelete = item;
+                    this.showDeleteModal = true;
+                },
+
+                deleteAsset() {
+                    if (this.itemToDelete) {
+                        let serialNo = this.itemToDelete['Serial No'] || 'N/A';
+                        let assetName = this.itemToDelete['Asset Name'] || '';
+
+                        this.assets = this.assets.filter(a => a !== this.itemToDelete);
+                        this.selectedAssets = this.selectedAssets.filter(a => a !== this.itemToDelete);
+                        this.saveToStorage();
+                        this.logAction('DELETE', serialNo, `ลบทรัพย์สิน: ${assetName}`);
+
+                        this.showDeleteModal = false;
+                        this.itemToDelete = null;
+                    }
+                },
+
+                confirmBulkDelete() {
+                    if (this.currentUser !== 'admin' || this.selectedAssets.length === 0) return;
+                    this.showBulkDeleteModal = true;
+                },
+
+                executeBulkDelete() {
+                    if (this.currentUser === 'admin' && this.selectedAssets.length > 0) {
+                        let count = this.selectedAssets.length;
+                        let serials = this.selectedAssets.map(a => a['Serial No'] || 'N/A').join(', ');
+
+                        this.assets = this.assets.filter(a => !this.selectedAssets.includes(a));
+                        this.selectedAssets = [];
+                        this.saveToStorage();
+                        this.logAction('DELETE', 'BULK-DELETE', `ลบทรัพย์สินแบบกลุ่มจำนวน ${count} รายการ (Serial: ${serials})`);
+
+                        this.showBulkDeleteModal = false;
+                    }
+                },
+
+                openUserModal() {
+                    if (this.currentUser !== 'admin') return;
+                    this.isUserEditMode = false;
+                    this.userForm = { username: '', password: '', warehouses: [] };
+                    this.userFormError = '';
+                    this.showUserModal = true;
+                },
+
+                editUser(username) {
+                    if (this.currentUser !== 'admin') return;
+                    this.isUserEditMode = true;
+                    this.userForm = {
+                        username: username,
+                        password: this.validUsers[username],
+                        warehouses: [...(this.userWarehouses[username] || [])]
+                    };
+                    this.userFormError = '';
+                    this.showUserModal = true;
+                },
+
+                saveUser() {
+                    if (this.currentUser !== 'admin') return;
+                    let u = this.userForm.username.trim();
+                    let p = this.userForm.password.trim();
+                    let whs = this.userForm.warehouses;
+
+                    if (!u || !p) {
+                        this.userFormError = 'กรุณากรอก Username และ Password';
+                        return;
+                    }
+
+                    if (!this.isUserEditMode && this.validUsers[u]) {
+                        this.userFormError = 'มีชื่อผู้ใช้งานนี้ในระบบแล้ว';
+                        return;
+                    }
+
+                    this.validUsers[u] = p;
+                    if (whs && whs.length > 0) {
+                        this.userWarehouses[u] = whs;
+                    } else {
+                        delete this.userWarehouses[u];
+                    }
+
+                    this.saveUsersToStorage();
+                    this.showUserModal = false;
+                },
+
+                confirmDeleteUser(username) {
+                    if (this.currentUser !== 'admin' || username === 'admin') return;
+                    this.userToDelete = username;
+                    this.showUserDeleteModal = true;
+                },
+
+                deleteUser() {
+                    if (this.currentUser === 'admin' && this.userToDelete && this.userToDelete !== 'admin') {
+                        delete this.validUsers[this.userToDelete];
+                        delete this.userWarehouses[this.userToDelete];
+                        this.saveUsersToStorage();
+                        this.showUserDeleteModal = false;
+                        this.userToDelete = null;
+                    }
+                },
+
+                exportCSV() {
+                    let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+                    csvContent += this.columns.join(",") + "\r\n";
+                    this.filteredAssets.forEach(row => {
+                        let rowData = this.columns.map(col => `"${(row[col] || '').replace(/"/g, '""')}"`);
+                        csvContent += rowData.join(",") + "\r\n";
+                    });
+                    let encodedUri = encodeURI(csvContent);
+                    let link = document.createElement("a");
+                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("download", "it_asset_manifest_export.csv");
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                },
+
+                previewImportCSV(event) {
+                    let file = event.target.files[0];
+                    if (!file) return;
+                    let reader = new FileReader();
+                    reader.onload = (e) => {
+                        let text = e.target.result;
+                        let lines = text.split(/\r\n|\n/).filter(line => line.trim() !== '');
+                        if (lines.length < 2) {
+                            alert('CSV file is empty or missing data rows.');
+                            event.target.value = '';
+                            return;
+                        }
+                        let parseCSVLine = (line) => {
+                            let result = [];
+                            let startValue = 0;
+                            let inQuotes = false;
+                            for (let i = 0; i < line.length; i++) {
+                                if (line[i] === '"') inQuotes = !inQuotes;
+                                else if (line[i] === ',' && !inQuotes) {
+                                    result.push(line.substring(startValue, i).replace(/^"|"$/g, '').replace(/""/g, '"'));
+                                    startValue = i + 1;
+                                }
+                            }
+                            result.push(line.substring(startValue).replace(/^"|"$/g, '').replace(/""/g, '"'));
+                            return result;
+                        };
+
+                        let headers = parseCSVLine(lines[0]);
+                        let newRows = [];
+                        let existingSerialSet = new Set(this.assets.map(a => a['Serial No']).filter(Boolean));
+                        let fileSerialSet = new Set();
+                        let duplicateSerials = [];
+
+                        for (let i = 1; i < lines.length; i++) {
+                            let data = parseCSVLine(lines[i]);
+                            let obj = {};
+                            this.columns.forEach(col => {
+                                let idx = headers.indexOf(col);
+                                obj[col] = (idx !== -1 && data[idx] !== undefined) ? data[idx] : '';
+                            });
+
+                            let serialNo = obj['Serial No'] ? obj['Serial No'].trim() : '';
+                            if (serialNo !== '') {
+                                if (existingSerialSet.has(serialNo) || fileSerialSet.has(serialNo)) {
+                                    duplicateSerials.push(serialNo);
+                                    continue;
+                                }
+                                fileSerialSet.add(serialNo);
+                            }
+                            newRows.push(obj);
+                        }
+
+                        this.importPreviewData = { newRows, duplicateSerials };
+                        this.showImportModal = true;
+                        event.target.value = '';
+                    };
+                    reader.readAsText(file, 'UTF-8');
+                },
+
+                executeImportCSV() {
+                    if (this.importPreviewData.newRows.length > 0) {
+                        this.importSuccessCount = this.importPreviewData.newRows.length;
+                        this.assets = this.importPreviewData.newRows.concat(this.assets);
+                        this.saveToStorage();
+                        this.logAction('IMPORT', 'BATCH-IMPORT', `นำเข้าข้อมูลผ่านไฟล์ CSV จำนวน ${this.importSuccessCount} รายการ`);
+                        this.showImportModal = false;
+                        this.showImportResultModal = true;
+                        this.currentPage = 1;
+                    } else {
+                        this.showImportModal = false;
+                        this.showImportErrorModal = true;
+                    }
+                    this.importPreviewData = { newRows: [], duplicateSerials: [] };
+                }
+            }
+        }
+    </script>
+</body>
+</html>
