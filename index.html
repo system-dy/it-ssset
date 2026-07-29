@@ -1910,6 +1910,9 @@
 
                 <!-- ================= PRINT VIEW (ตามแบบฟอร์ม Excel แนบ) ================= -->
                 <div class="hidden print:block text-slate-900" style="font-family:'Sarabun', sans-serif;">
+                    <!-- แบ่งพิมพ์ทีละ 25 แถวต่อหน้า เมื่อรายการเกิน 25 รายการ (เดิม fix 25 แถวหน้าเดียว) -->
+                    <template x-for="pageIdx in requisitionPrintPages()" :key="'reqpage'+pageIdx">
+                    <div :style="pageIdx < requisitionPrintPages().length - 1 ? 'page-break-after: always;' : ''">
 
                     <!-- Header: Logo (กึ่งกลางด้านบน) + ชื่อฟอร์ม -->
                     <div style="text-align:center; margin-bottom:2mm;">
@@ -1922,9 +1925,12 @@
                         เลขที่ใบเบิก: <span style="font-weight:700;" x-text="viewRequisition ? viewRequisition.docNo : ''"></span>
                         &nbsp;&nbsp;&nbsp;&nbsp;
                         วัน / เดือน / ปี (DD/MM/YY): <span style="font-weight:700;" x-text="viewRequisition ? viewRequisition.createdAt : ''"></span>
+                        <template x-if="requisitionPrintPages().length > 1">
+                            <span>&nbsp;&nbsp;&nbsp;&nbsp;หน้า <span style="font-weight:700;" x-text="pageIdx + 1"></span>/<span style="font-weight:700;" x-text="requisitionPrintPages().length"></span></span>
+                        </template>
                     </div>
 
-                    <!-- ตารางรายการ 25 แถว -->
+                    <!-- ตารางรายการ 25 แถวต่อหน้า -->
                     <table style="width:100%; border-collapse:collapse; table-layout:fixed; font-size:8pt;">
                         <colgroup>
                             <col style="width:7%;">
@@ -1943,23 +1949,27 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <template x-for="(slot, idx) in Array.from({length:25})" :key="'printrow'+idx">
+                            <template x-for="(slot, rowIdx) in Array.from({length:25})" :key="'printrow'+pageIdx+'_'+rowIdx">
                                 <tr>
-                                    <td style="border:0.75pt solid #000; padding:0.8mm; height:6mm; text-align:center;" x-text="idx + 1"></td>
-                                    <td style="border:0.75pt solid #000; padding:0.8mm 0.8mm 0.8mm 2mm; text-align:left;" x-text="(viewRequisition && viewRequisition.items[idx]) ? (viewRequisition.items[idx]['Asset Type'] || viewRequisition.items[idx]['Product ID'] || '-') : ''"></td>
-                                    <td style="border:0.75pt solid #000; padding:0.8mm; text-align:center;" x-text="(viewRequisition && viewRequisition.items[idx]) ? viewRequisition.items[idx]['Serial No'] : ''"></td>
-                                    <td style="border:0.75pt solid #000; padding:0.8mm; text-align:center;" x-text="(viewRequisition && viewRequisition.items[idx]) ? viewRequisition.items[idx]['Quantity'] : ''"></td>
+                                    <td style="border:0.75pt solid #000; padding:0.8mm; height:6mm; text-align:center;" x-text="pageIdx*25 + rowIdx + 1"></td>
+                                    <td style="border:0.75pt solid #000; padding:0.8mm 0.8mm 0.8mm 2mm; text-align:left;" x-text="(viewRequisition && viewRequisition.items[pageIdx*25+rowIdx]) ? (viewRequisition.items[pageIdx*25+rowIdx]['Asset Type'] || viewRequisition.items[pageIdx*25+rowIdx]['Product ID'] || '-') : ''"></td>
+                                    <td style="border:0.75pt solid #000; padding:0.8mm; text-align:center;" x-text="(viewRequisition && viewRequisition.items[pageIdx*25+rowIdx]) ? viewRequisition.items[pageIdx*25+rowIdx]['Serial No'] : ''"></td>
+                                    <td style="border:0.75pt solid #000; padding:0.8mm; text-align:center;" x-text="(viewRequisition && viewRequisition.items[pageIdx*25+rowIdx]) ? viewRequisition.items[pageIdx*25+rowIdx]['Quantity'] : ''"></td>
                                     <td style="border:0.75pt solid #000; padding:0.8mm;">&nbsp;</td>
                                 </tr>
                             </template>
-                            <tr>
-                                <td style="border:0.75pt solid #000; padding:0.8mm; height:6mm; font-weight:700;" colspan="3">รวมทั้งสิ้น</td>
-                                <td style="border:0.75pt solid #000; padding:0.8mm; text-align:center; font-weight:700;" x-text="viewRequisition ? viewRequisition.items.reduce((s, i) => s + (Number(i['Quantity']) || 0), 0) : 0"></td>
-                                <td style="border:0.75pt solid #000; padding:0.8mm;">&nbsp;</td>
-                            </tr>
+                            <template x-if="pageIdx === requisitionPrintPages().length - 1">
+                                <tr>
+                                    <td style="border:0.75pt solid #000; padding:0.8mm; height:6mm; font-weight:700;" colspan="3">รวมทั้งสิ้น</td>
+                                    <td style="border:0.75pt solid #000; padding:0.8mm; text-align:center; font-weight:700;" x-text="viewRequisition ? viewRequisition.items.reduce((s, i) => s + (Number(i['Quantity']) || 0), 0) : 0"></td>
+                                    <td style="border:0.75pt solid #000; padding:0.8mm;">&nbsp;</td>
+                                </tr>
+                            </template>
                         </tbody>
                     </table>
 
+                    <template x-if="pageIdx === requisitionPrintPages().length - 1">
+                    <div>
                     <p style="font-size:8.5pt; margin:8mm 0 0 7%;">ได้ตรวจรับมอบอุปกรณ์ตามจำนวนดังระบุข้างต้นไว้ครบถ้วนเรียบร้อย</p>
 
                     <div style="display:grid; grid-template-columns:7% 29% 29% 35%; gap:0 3mm; text-align:center; font-size:8.5pt; margin-top:3mm;">
@@ -1995,6 +2005,11 @@
                     <p style="font-size:8pt; margin:13mm 0 0 0;">หมายเหตุ: เลขที่ใบเบิก <span x-text="viewRequisition ? viewRequisition.docNo : ''"></span> | ผู้ขอเบิก <span x-text="viewRequisition ? viewRequisition.requestedBy : ''"></span> | แผนก/Warehouse <span x-text="viewRequisition ? viewRequisition.requestDept : ''"></span><template x-if="viewRequisition && viewRequisition.note"><span> | <span x-text="viewRequisition.note"></span></span></template></p>
 
                     <p style="font-size:7.5pt; text-align:center; margin:3mm 0 0 0;">เบอรี่ ยุคเกอร์ หรือ BJC ซอยรูเปีย ถนนสุขุมวิท 42 แขวงพระโขนง เขตคลองเตย กทม. 10110 อาคาร B ชั้น 11 แผนก MIS</p>
+                    </div>
+                    </template>
+
+                    </div>
+                    </template>
                 </div>
             </div>
             <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3 print:hidden">
@@ -8228,6 +8243,15 @@
 
                 printRequisitionDetail() {
                     window.print();
+                },
+
+                // คืนค่า array ของเลขหน้า [0,1,2,...] สำหรับแบ่งพิมพ์ใบเบิกทีละ 25 แถวต่อหน้า
+                // (เดิม hardcode Array.from({length:25}) แถวเดียว ทำให้รายการเกิน 25 ไม่ถูกพิมพ์)
+                requisitionPrintPages() {
+                    const items = (this.viewRequisition && this.viewRequisition.items) ? this.viewRequisition.items : [];
+                    const rowsPerPage = 25;
+                    const pageCount = Math.max(1, Math.ceil(items.length / rowsPerPage));
+                    return Array.from({ length: pageCount }, (_, i) => i);
                 },
 
                 confirmDeleteRequisition(req) {
