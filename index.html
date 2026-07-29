@@ -155,9 +155,9 @@
                     <i class="fa-solid fa-chart-pie w-5"></i>
                     <span>Dashboard</span>
                 </button>
-                <button @click="currentTab = 'requisition'; focusScanInput()" 
+                <button x-show="currentUser === 'admin'" @click="currentTab = 'requisition'; focusScanInput()" 
                     :class="{'bg-indigo-600 text-white': currentTab === 'requisition', 'text-slate-300 hover:bg-slate-800': currentTab !== 'requisition'}"
-                    class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition font-medium text-left">
+                    class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition font-medium text-left" style="display: none;">
                     <i class="fa-solid fa-clipboard-list w-5"></i>
                     <span>Requisition IT equipment</span>
                 </button>
@@ -168,7 +168,7 @@
                     <span>Asset Management</span>
                 </button>
                 <!-- Master Data -->
-                <div class="space-y-1">
+                <div x-show="currentUser === 'admin'" class="space-y-1" style="display: none;">
                     <button @click="isMasterDataOpen = !isMasterDataOpen" 
                         :class="{'bg-slate-800 text-white': isMasterDataOpen, 'text-slate-300 hover:bg-slate-800': !isMasterDataOpen}"
                         class="w-full flex items-center justify-between px-4 py-3 rounded-lg transition font-medium text-left">
@@ -270,7 +270,7 @@
                                 <div class="p-2 bg-slate-100 text-slate-700 rounded-lg"><i class="fa-solid fa-clock-rotate-left"></i></div>
                                 <h3 class="text-lg font-bold text-slate-800">แสดงรายการการปรับปรุงข้อมูลล่าสุด</h3>
                             </div>
-                            <button @click="confirmClearLogs()" x-show="auditLogs.length > 0"
+                            <button @click="confirmClearLogs()" x-show="currentUser === 'admin' && auditLogs.length > 0" style="display: none;"
                                 class="flex items-center space-x-2 px-3 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs font-medium hover:bg-rose-100 transition">
                                 <i class="fa-solid fa-trash-can"></i>
                                 <span>Clear Log</span>
@@ -345,32 +345,41 @@
                 <div x-show="currentTab === 'assets'" class="space-y-6">
                     
                     <!-- Action Toolbar -->
-                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-wrap items-center justify-between gap-4">
-                        <div class="flex items-center space-x-3 w-full md:w-auto flex-1">
-                            <div class="relative w-full md:w-80">
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div class="w-full lg:max-w-md">
+                            <div class="relative">
                                 <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fa-solid fa-search"></i></span>
                                 <input type="text" x-model="searchQuery" @input="currentPage = 1" placeholder="Search assets (Code, Name, Serial)..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                             </div>
                         </div>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <!-- ปุ่มลบหลายรายการ (แสดงเฉพาะ Admin)[cite: 1] -->
-                            <button x-show="currentUser === 'admin'" @click="confirmBulkDelete()" :disabled="selectedAssets.length === 0" class="px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-700 transition flex items-center space-x-2 disabled:opacity-40 disabled:cursor-not-allowed" style="display: none;">
-                                <i class="fa-solid fa-trash-can"></i><span>Delete Selected (<span x-text="selectedAssets.length"></span>)</span>
-                            </button>
 
-                            <button @click="openModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center space-x-2">
-                                <i class="fa-solid fa-plus"></i><span>Add New Asset</span>
-                            </button>
-                            <label class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition cursor-pointer flex items-center space-x-2">
-                                <i class="fa-solid fa-file-import"></i><span>Import CSV</span>
-                                <input type="file" accept=".csv" @change="previewImportCSV($event)" class="hidden">
-                            </label>
-                            <button @click="exportCSV()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center space-x-2">
-                                <i class="fa-solid fa-file-export"></i><span>Export CSV</span>
-                            </button>
-                            <a href="#" @click.prevent="downloadTemplate()" class="px-2 py-2 text-black-600 text-sm font-medium hover:text-blue-800 hover:underline transition flex items-center space-x-1.5" title="Download Template">
-                                <i class="fa-solid fa-download"></i><span></span>
-                            </a>
+                        <div class="w-full lg:w-auto flex flex-col gap-3">
+                            <div class="flex flex-wrap items-center gap-2 lg:justify-end">
+                                <!-- ปุ่มลบหลายรายการ (แสดงเฉพาะ Admin) -->
+                                <button x-show="currentUser === 'admin'" @click="confirmBulkDelete()" :disabled="selectedAssets.length === 0" class="px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-700 transition flex items-center space-x-2 disabled:opacity-40 disabled:cursor-not-allowed" style="display: none;">
+                                    <i class="fa-solid fa-trash-can"></i><span>Delete Selected (<span x-text="selectedAssets.length"></span>)</span>
+                                </button>
+                                <button @click="openModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center space-x-2">
+                                    <i class="fa-solid fa-plus"></i><span>Add New Asset</span>
+                                </button>
+                                <label class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition cursor-pointer flex items-center space-x-2">
+                                    <i class="fa-solid fa-file-import"></i><span>Import CSV</span>
+                                    <input type="file" accept=".csv" @change="previewImportCSV($event)" class="hidden">
+                                </label>
+                            </div>
+
+                            <div class="flex flex-wrap items-center gap-2 border-t border-gray-200 pt-3 lg:justify-end">
+                                <span class="mr-1 text-xs font-medium text-gray-500"></span>
+                                <button @click="exportCSV()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center space-x-2">
+                                    <i class="fa-solid fa-file-export"></i><span>Export CSV</span>
+                                </button>
+                                <button @click="exportSLMSPlusCSV()" class="px-4 py-2 bg-violet-600 text-white rounded-lg text-sm font-medium hover:bg-violet-700 transition flex items-center space-x-2">
+                                    <i class="fa-solid fa-file-export"></i><span>Export to SLMS+</span>
+                                </button>
+                                <a href="#" @click.prevent="downloadTemplate()" class="px-3 py-2 text-sm font-medium text-slate-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg transition flex items-center space-x-2" title="Download Template">
+                                    <i class="fa-solid fa-download"></i><span></span>
+                                </a>
+                            </div>
                         </div>
                     </div>
 
@@ -1437,7 +1446,12 @@
                                                         <input type="date" x-model="item[col]" class="w-full min-w-[9rem] px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                                                     </template>
                                                     <template x-if="col === 'Warehouse'">
-                                                        <input type="text" x-model="item[col]" list="requisitionWarehouseListRow" class="w-full min-w-[9rem] px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                                        <select x-model="item[col]" required class="w-full min-w-[9rem] px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                                                            <option value="">-- เลือก Warehouse --</option>
+                                                            <template x-for="wh in warehouseOptions" :key="wh">
+                                                                <option :value="wh" x-text="wh"></option>
+                                                            </template>
+                                                        </select>
                                                     </template>
                                                     <template x-if="col === 'Product ID'">
                                                         <input type="text" x-model="item[col]" list="requisitionProductIdListRow" class="w-full min-w-[9rem] px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -1505,11 +1519,6 @@
                                 <option :value="opt"></option>
                             </template>
                         </datalist>
-                        <datalist id="requisitionWarehouseListRow">
-                            <template x-for="wh in warehouseOptions" :key="wh">
-                                <option :value="wh"></option>
-                            </template>
-                        </datalist>
                         <datalist id="requisitionProductIdListRow">
                             <template x-for="opt in requisitionProductIdOptions" :key="opt">
                                 <option :value="opt"></option>
@@ -1541,7 +1550,7 @@
                                 </datalist>
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-gray-700 mb-1">Warehouse</label>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">Warehouse / Hub <span class="text-rose-500">*</span></label>
                                 <input type="text" x-model="requisitionForm.requestDept" list="requisitionWarehouseList" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                                 <datalist id="requisitionWarehouseList">
                                     <template x-for="wh in warehouseOptions" :key="wh">
@@ -1554,7 +1563,7 @@
                                 <input type="text" x-model="requisitionForm.note" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                             </div>
                             <div class="md:col-span-3 flex justify-end">
-                                <button @click="submitRequisition()" :disabled="requisitionItems.length === 0 || !requisitionForm.requestedBy.trim()" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-2">
+                                <button @click="submitRequisition()" :disabled="requisitionItems.length === 0 || !requisitionForm.requestedBy.trim() || !requisitionForm.requestDept.trim()" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-2">
                                     <i class="fa-solid fa-paper-plane"></i><span>บันทึกใบเบิก</span>
                                 </button>
                             </div>
@@ -1712,7 +1721,58 @@
                             </div>
                         </template>
 
-                        <template x-if="col !== 'Warehouse' && col !== 'Transfer / Use' && col !== 'Action' && col !== 'Requested Date' && col !== 'Requested By'">
+                        <!-- Asset Type ID: ตัวเลือกจาก Master Data > Asset Type คอลัมน์ Asset Type ID -->
+                        <template x-if="col === 'Asset Type ID'">
+                            <div>
+                                <input type="text" x-model="form[col]" @input="form['Asset Type'] = assetTypeDescriptionById(form['Asset Type ID'])" list="assetFormAssetTypeIdList" placeholder="เลือกหรือพิมพ์ข้อมูล..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                                <datalist id="assetFormAssetTypeIdList">
+                                    <template x-for="opt in requisitionAssetTypeIdOptions" :key="opt">
+                                        <option :value="opt"></option>
+                                    </template>
+                                </datalist>
+                            </div>
+                        </template>
+
+                        <!-- Asset Description: ผู้ใช้กรอกข้อมูลเองได้ -->
+                        <template x-if="col === 'Asset Description'">
+                            <input type="text" x-model="form[col]" placeholder="กรอกข้อมูล Asset Description" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                        </template>
+
+                        <!-- Asset Type: อ่านค่าอัตโนมัติจาก Asset Type ID -> Master Data > Asset Type คอลัมน์ Asset Type Description -->
+                        <template x-if="col === 'Asset Type'">
+                            <input type="text" :value="assetTypeDescriptionById(form['Asset Type ID'])" readonly placeholder="จะแสดงอัตโนมัติจาก Asset Type ID" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-100 text-gray-600 cursor-not-allowed">
+                        </template>
+
+                        <!-- Product ID: ตัวเลือกจาก Master Data > Product คอลัมน์ Procuct ID -->
+                        <template x-if="col === 'Product ID'">
+                            <div>
+                                <input type="text" x-model="form[col]" list="assetFormProductIdList" placeholder="เลือกหรือพิมพ์ข้อมูล..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                                <datalist id="assetFormProductIdList">
+                                    <template x-for="opt in requisitionProductIdOptions" :key="opt">
+                                        <option :value="opt"></option>
+                                    </template>
+                                </datalist>
+                            </div>
+                        </template>
+
+                        <!-- Seller Supplier Code: ตัวเลือกจาก Master Data > Supplier คอลัมน์ Seller Supplier Code -->
+                        <template x-if="col === 'Seller Supplier Code'">
+                            <div>
+                                <input type="text" x-model="form[col]" @input="form['Service Supplier Code'] = serviceSupplierCodeBySellerCode(form['Seller Supplier Code'])" list="assetFormSellerSupplierCodeList" placeholder="เลือกหรือพิมพ์ข้อมูล..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                                <datalist id="assetFormSellerSupplierCodeList">
+                                    <template x-for="opt in requisitionSellerSupplierCodeOptions" :key="opt">
+                                        <option :value="opt"></option>
+                                    </template>
+                                </datalist>
+                            </div>
+                        </template>
+
+                        <!-- Service Supplier Code (Supplier Code): อ่านค่าอัตโนมัติจาก Seller Supplier Code -> Master Data > Supplier คอลัมน์ Supplier Code -->
+                        <template x-if="col === 'Service Supplier Code'">
+                            <input type="text" :value="serviceSupplierCodeBySellerCode(form['Seller Supplier Code'])" readonly placeholder="จะแสดงอัตโนมัติจาก Seller Supplier Code" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-100 text-gray-600 cursor-not-allowed">
+                        </template>
+
+                        <template x-if="!['Warehouse','Transfer / Use','Action','Requested Date','Requested By','Asset Type ID','Asset Description','Asset Type','Product ID','Seller Supplier Code','Service Supplier Code'].includes(col)">
                             <input type="text" x-model="form[col]" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         </template>
                     </div>
@@ -2117,7 +2177,7 @@
     </div>
 
     <!-- Modal Confirmation Popup for Clear Log -->
-    <div x-show="showClearLogModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style="display: none;">
+    <div x-show="showClearLogModal && currentUser === 'admin'" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style="display: none;">
         <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center space-y-4">
             <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-2xl">
                 <i class="fa-solid fa-trash-can"></i>
@@ -5874,10 +5934,12 @@
                 },
 
                 confirmClearLogs() {
+                    if (this.currentUser !== 'admin') return;
                     this.showClearLogModal = true;
                 },
 
                 clearLogs() {
+                    if (this.currentUser !== 'admin') return;
                     this.auditLogs = [];
                     db.ref('logs').remove()
                         .catch((error) => this.handleDbError('clear logs', error));
@@ -6431,16 +6493,33 @@
                     document.body.removeChild(link);
                 },
 
+                // ฟังก์ชันกลางสำหรับสร้างและดาวน์โหลดไฟล์ CSV Template (ใช้แทน XLSX.writeFile)
+                downloadCSVTemplate(headerRow, exampleRow, filename) {
+                    let escapeCSV = (val) => {
+                        val = String(val ?? '');
+                        if (/[",\n\r]/.test(val)) {
+                            val = '"' + val.replace(/"/g, '""') + '"';
+                        }
+                        return val;
+                    };
+                    let csvContent = [headerRow, exampleRow].map(row => row.map(escapeCSV).join(',')).join('\r\n');
+                    // เติม BOM (\uFEFF) เพื่อให้ Excel เปิดไฟล์ CSV ภาษาไทย (UTF-8) แสดงผลถูกต้อง
+                    let blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                    let url = URL.createObjectURL(blob);
+                    let link = document.createElement('a');
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', filename);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                },
+
                 downloadBranchTemplate() {
                     let headerRow = this.branchColumns;
                     let exampleRow = this.branchColumns.map(col => col === 'Branch Area' ? 'เช่น ภาคตะวันออกเฉียงเหนือ' : '');
-                    let wsData = [headerRow, exampleRow];
-                    let ws = XLSX.utils.aoa_to_sheet(wsData);
-                    ws['!cols'] = this.branchColumns.map(col => ({ wch: col === 'Branch Area' ? 28 : 18 }));
-
-                    let wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, 'Template');
-                    XLSX.writeFile(wb, 'Branch_Import_Template.xlsx');
+                    this.downloadCSVTemplate(headerRow, exampleRow, 'Branch_Import_Template.csv');
 
                     this.logAction('EXPORT', 'TEMPLATE-DOWNLOAD', 'ดาวน์โหลด Template เปล่าสำหรับ Import ข้อมูล Branch');
                 },
@@ -6696,13 +6775,7 @@
                 downloadAssetTypeTemplate() {
                     let headerRow = this.assetTypeColumns;
                     let exampleRow = this.assetTypeColumns.map(col => col === 'Asset Type Description' ? 'เช่น Notebook' : '');
-                    let wsData = [headerRow, exampleRow];
-                    let ws = XLSX.utils.aoa_to_sheet(wsData);
-                    ws['!cols'] = this.assetTypeColumns.map(col => ({ wch: col === 'Asset Type Description' ? 28 : 18 }));
-
-                    let wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, 'Template');
-                    XLSX.writeFile(wb, 'AssetType_Import_Template.xlsx');
+                    this.downloadCSVTemplate(headerRow, exampleRow, 'AssetType_Import_Template.csv');
 
                     this.logAction('EXPORT', 'TEMPLATE-DOWNLOAD', 'ดาวน์โหลด Template เปล่าสำหรับ Import ข้อมูล Asset Type');
                 },
@@ -6956,13 +7029,7 @@
                 downloadSupplierTemplate() {
                     let headerRow = this.supplierColumns;
                     let exampleRow = this.supplierColumns.map(col => col === 'Supplier Name' ? 'เช่น บริษัท เอบีซี จำกัด' : '');
-                    let wsData = [headerRow, exampleRow];
-                    let ws = XLSX.utils.aoa_to_sheet(wsData);
-                    ws['!cols'] = this.supplierColumns.map(col => ({ wch: col === 'Supplier Name' ? 28 : 18 }));
-
-                    let wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, 'Template');
-                    XLSX.writeFile(wb, 'Supplier_Import_Template.xlsx');
+                    this.downloadCSVTemplate(headerRow, exampleRow, 'Supplier_Import_Template.csv');
 
                     this.logAction('EXPORT', 'TEMPLATE-DOWNLOAD', 'ดาวน์โหลด Template เปล่าสำหรับ Import ข้อมูล Supplier');
                 },
@@ -7216,13 +7283,7 @@
                 downloadProductTemplate() {
                     let headerRow = this.productColumns;
                     let exampleRow = this.productColumns.map(col => col === 'Product Name' ? 'เช่น Notebook Dell Latitude 5420' : '');
-                    let wsData = [headerRow, exampleRow];
-                    let ws = XLSX.utils.aoa_to_sheet(wsData);
-                    ws['!cols'] = this.productColumns.map(col => ({ wch: col === 'Product Name' ? 28 : 18 }));
-
-                    let wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, 'Template');
-                    XLSX.writeFile(wb, 'Product_Import_Template.xlsx');
+                    this.downloadCSVTemplate(headerRow, exampleRow, 'Product_Import_Template.csv');
 
                     this.logAction('EXPORT', 'TEMPLATE-DOWNLOAD', 'ดาวน์โหลด Template เปล่าสำหรับ Import ข้อมูล Product');
                 },
@@ -7476,13 +7537,7 @@
                 downloadBrandTemplate() {
                     let headerRow = this.brandColumns;
                     let exampleRow = this.brandColumns.map(col => col === 'Brand Name' ? 'เช่น Dell' : '');
-                    let wsData = [headerRow, exampleRow];
-                    let ws = XLSX.utils.aoa_to_sheet(wsData);
-                    ws['!cols'] = this.brandColumns.map(col => ({ wch: col === 'Brand Name' ? 28 : 18 }));
-
-                    let wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, 'Template');
-                    XLSX.writeFile(wb, 'Brand_Import_Template.xlsx');
+                    this.downloadCSVTemplate(headerRow, exampleRow, 'Brand_Import_Template.csv');
 
                     this.logAction('EXPORT', 'TEMPLATE-DOWNLOAD', 'ดาวน์โหลด Template เปล่าสำหรับ Import ข้อมูล Brand');
                 },
@@ -7736,13 +7791,7 @@
                 downloadModelTemplate() {
                     let headerRow = this.modelColumns;
                     let exampleRow = this.modelColumns.map(col => col === 'Model' ? 'เช่น Latitude 5420' : '');
-                    let wsData = [headerRow, exampleRow];
-                    let ws = XLSX.utils.aoa_to_sheet(wsData);
-                    ws['!cols'] = this.modelColumns.map(col => ({ wch: col === 'Model' ? 28 : 18 }));
-
-                    let wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, 'Template');
-                    XLSX.writeFile(wb, 'Model_Import_Template.xlsx');
+                    this.downloadCSVTemplate(headerRow, exampleRow, 'Model_Import_Template.csv');
 
                     this.logAction('EXPORT', 'TEMPLATE-DOWNLOAD', 'ดาวน์โหลด Template เปล่าสำหรับ Import ข้อมูล Model');
                 },
@@ -7894,7 +7943,7 @@
                 },
 
                 get requisitionScanFormColumns() {
-                    return this.columns.filter(col => !['Serial No', 'Asset Number', 'Warehouse', 'Action', 'Transfer / Use'].includes(col));
+                    return this.columns.filter(col => !['Serial No', 'Asset Number', 'Warehouse', 'Action', 'Transfer / Use', 'Requested By'].includes(col));
                 },
 
                 // อ่านค่า Asset Type Description จาก Master Data > Asset Type โดยจับคู่กับ Asset Type ID ที่ระบุ
@@ -8122,6 +8171,10 @@
                         alert('กรุณาระบุผู้ขอเบิก (Requested By) ก่อนบันทึกใบเบิก');
                         return;
                     }
+                    if (!this.requisitionForm.requestDept || !this.requisitionForm.requestDept.trim()) {
+                        alert('กรุณาเลือก Warehouse / Hub ก่อนบันทึกใบเบิก');
+                        return;
+                    }
                     const now = new Date();
                     const createdAt = now.toLocaleString('th-TH', {
                         year: 'numeric', month: '2-digit', day: '2-digit',
@@ -8286,18 +8339,35 @@
                     document.body.removeChild(link);
                 },
 
+                exportSLMSPlusCSV() {
+                    const slmsColumns = [
+                        'Asset Code', 'Asset Name', 'Asset Type ID', 'Asset Description',
+                        'Serial No', 'Tag Barcode', 'Branch Code', 'Product ID',
+                        'Seller Supplier Code', 'Service Supplier Code', 'Start Warranty Date',
+                        'End Warranty Date', 'Status', 'Purchase Order No',
+                        'Operation Device Status', 'Location', 'Remark'
+                    ];
+                    let csvContent = 'data:text/csv;charset=utf-8,\uFEFF';
+                    csvContent += slmsColumns.join(',') + '\r\n';
+                    this.filteredAssets.forEach(row => {
+                        let rowData = slmsColumns.map(col => '"' + String(row[col] ?? '').replace(/"/g, '""') + '"');
+                        csvContent += rowData.join(',') + '\r\n';
+                    });
+                    let link = document.createElement('a');
+                    link.setAttribute('href', encodeURI(csvContent));
+                    link.setAttribute('download', 'SLMS_Plus_Asset_Export_' + new Date().toISOString().slice(0, 10) + '.csv');
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    this.logAction('EXPORT', 'SLMS+-EXPORT', 'Export ข้อมูล Asset สำหรับ SLMS+ จำนวน ' + this.filteredAssets.length + ' รายการ');
+                },
+
                 downloadTemplate() {
                     // สร้างไฟล์ Template เปล่า (มีเฉพาะหัวคอลัมน์) สำหรับใช้กรอกข้อมูลก่อน Import
                     // แถวที่ 2 เป็นแถวคำอธิบาย/ตัวอย่าง โดยจะระบุคำอธิบายเฉพาะคอลัมน์ Warehouse เท่านั้น
                     let headerRow = this.columns;
                     let exampleRow = this.columns.map(col => col === 'Warehouse' ? 'เช่น 11233-โคราช 2' : '');
-                    let wsData = [headerRow, exampleRow];
-                    let ws = XLSX.utils.aoa_to_sheet(wsData);
-                    ws['!cols'] = this.columns.map(col => ({ wch: col === 'Warehouse' ? 24 : 18 }));
-
-                    let wb = XLSX.utils.book_new();
-                    XLSX.utils.book_append_sheet(wb, ws, 'Template');
-                    XLSX.writeFile(wb, 'Asset_Import_Template.xlsx');
+                    this.downloadCSVTemplate(headerRow, exampleRow, 'Asset_Import_Template.csv');
 
                     this.logAction('EXPORT', 'TEMPLATE-DOWNLOAD', 'ดาวน์โหลด Template เปล่าสำหรับ Import ข้อมูล Asset');
                 },
