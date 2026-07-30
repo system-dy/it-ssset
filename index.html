@@ -182,6 +182,7 @@
                         <button @click="currentTab = 'masterdata'; selectedMasterData = 'Product'" :class="{'bg-slate-800 text-white': currentTab === 'masterdata' && selectedMasterData === 'Product'}" class="w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm text-slate-300 hover:bg-slate-800 hover:text-white text-left"><i class="fa-solid fa-cubes w-4"></i><span>Product</span></button>
                         <button @click="currentTab = 'masterdata'; selectedMasterData = 'Brand'" :class="{'bg-slate-800 text-white': currentTab === 'masterdata' && selectedMasterData === 'Brand'}" class="w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm text-slate-300 hover:bg-slate-800 hover:text-white text-left"><i class="fa-solid fa-copyright w-4"></i><span>Brand</span></button>
                         <button @click="currentTab = 'masterdata'; selectedMasterData = 'Model'" :class="{'bg-slate-800 text-white': currentTab === 'masterdata' && selectedMasterData === 'Model'}" class="w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm text-slate-300 hover:bg-slate-800 hover:text-white text-left"><i class="fa-solid fa-cube w-4"></i><span>Model</span></button>
+                        <button @click="currentTab = 'masterdata'; selectedMasterData = 'Requested By'" :class="{'bg-slate-800 text-white': currentTab === 'masterdata' && selectedMasterData === 'Requested By'}" class="w-full flex items-center space-x-3 px-3 py-2 rounded-md text-sm text-slate-300 hover:bg-slate-800 hover:text-white text-left"><i class="fa-solid fa-user-tag w-4"></i><span>Requested By</span></button>
                     </div>
                 </div>
 
@@ -1006,6 +1007,100 @@
                                             </button>
                                         </template>
                                         <button @click="changeModelPage(modelCurrentPage + 1)" :disabled="modelCurrentPage === totalModelPages || totalModelPages === 0" class="px-3 py-1.5 border border-gray-300 rounded-md bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                            ถัดไป <i class="fa-solid fa-chevron-right"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- ===== Requested By Master Data ===== -->
+                    <template x-if="selectedMasterData === 'Requested By'">
+                        <div class="space-y-6">
+                            <!-- Toolbar -->
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                <div class="relative w-full md:w-80">
+                                    <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fa-solid fa-magnifying-glass"></i></span>
+                                    <input type="text" x-model="requestedBySearchQuery" @input="requestedByCurrentPage = 1" placeholder="Search Requested By..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                </div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <!-- ปุ่มลบหลายรายการ (แสดงเฉพาะ Admin) -->
+                                    <button x-show="currentUser === 'admin'" @click="confirmBulkDeleteRequestedBy()" :disabled="selectedRequestedBys.length === 0" class="px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-700 transition flex items-center space-x-2 disabled:opacity-40 disabled:cursor-not-allowed" style="display: none;">
+                                        <i class="fa-solid fa-trash-can"></i><span>Delete Selected (<span x-text="selectedRequestedBys.length"></span>)</span>
+                                    </button>
+
+                                    <button @click="openRequestedByModal()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center space-x-2">
+                                        <i class="fa-solid fa-plus"></i><span>Add New Requested By</span>
+                                    </button>
+                                    <label class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition cursor-pointer flex items-center space-x-2">
+                                        <i class="fa-solid fa-file-import"></i><span>Import CSV</span>
+                                        <input type="file" accept=".csv" @change="previewImportRequestedByCSV($event)" class="hidden">
+                                    </label>
+                                    <button @click="exportRequestedByCSV()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center space-x-2">
+                                        <i class="fa-solid fa-file-export"></i><span>Export CSV</span>
+                                    </button>
+                                    <a href="#" @click.prevent="downloadRequestedByTemplate()" class="px-2 py-2 text-black-600 text-sm font-medium hover:text-blue-800 hover:underline transition flex items-center space-x-1.5" title="Download Template">
+                                        <i class="fa-solid fa-download"></i><span></span>
+                                    </a>
+                                </div>
+                            </div>
+
+                            <!-- Data Table Card -->
+                            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
+                                <div class="overflow-x-auto" style="max-height: 600px;">
+                                    <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
+                                        <thead class="bg-slate-800 text-white sticky top-0 z-10">
+                                            <tr>
+                                                <th x-show="currentUser === 'admin'" class="px-3 py-3 w-10 text-center border-r border-slate-700" style="display: none;">
+                                                    <input type="checkbox" @change="toggleSelectAllRequestedBys()" :checked="isAllRequestedBysSelected" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer">
+                                                </th>
+                                                <template x-for="col in requestedByColumns" :key="col">
+                                                    <th class="px-3 py-3 font-semibold uppercase tracking-wider border-r border-slate-700" x-text="col"></th>
+                                                </template>
+                                                <th class="px-3 py-3 font-semibold uppercase tracking-wider text-center sticky right-0 bg-slate-800">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-200 bg-white">
+                                            <template x-for="(item, index) in paginatedRequestedBys" :key="index">
+                                                <tr class="hover:bg-indigo-50/55 transition" :class="{'bg-indigo-50/30': selectedRequestedBys.includes(item)}">
+                                                    <td x-show="currentUser === 'admin'" class="px-3 py-2.5 text-center border-r border-gray-100" style="display: none;">
+                                                        <input type="checkbox" value="" @change="toggleSelectRequestedBy(item)" :checked="selectedRequestedBys.includes(item)" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer">
+                                                    </td>
+                                                    <template x-for="col in requestedByColumns" :key="col">
+                                                        <td class="px-3 py-2.5 border-r border-gray-100 text-slate-700" x-text="item[col] || '-'"></td>
+                                                    </template>
+                                                    <td class="px-3 py-2.5 text-center sticky right-0 bg-white shadow-l">
+                                                        <button @click="editRequestedBy(item)" class="text-indigo-600 hover:text-indigo-900 mx-1 p-1" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                                                        <button @click="confirmDeleteRequestedBy(item)" class="text-rose-600 hover:text-rose-900 mx-1 p-1" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                            <template x-if="filteredRequestedBys.length === 0">
+                                                <tr>
+                                                    <td :colspan="requestedByColumns.length + (currentUser === 'admin' ? 2 : 1)" class="text-center py-10 text-gray-400">No records found. Click "Add New Requested By" or Import CSV.</td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Pagination Bar -->
+                                <div class="px-6 py-4 bg-white border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-600">
+                                    <div>
+                                        แสดง <span class="font-semibold text-slate-800" x-text="filteredRequestedBys.length > 0 ? (requestedByCurrentPage - 1) * requestedByItemsPerPage + 1 : 0"></span> ถึง <span class="font-semibold text-slate-800" x-text="Math.min(requestedByCurrentPage * requestedByItemsPerPage, filteredRequestedBys.length)"></span> จากทั้งหมด <span class="font-semibold text-slate-800" x-text="filteredRequestedBys.length"></span> รายการ
+                                    </div>
+                                    <div class="flex items-center space-x-1">
+                                        <button @click="changeRequestedByPage(requestedByCurrentPage - 1)" :disabled="requestedByCurrentPage === 1" class="px-3 py-1.5 border border-gray-300 rounded-md bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                                            <i class="fa-solid fa-chevron-left"></i> ก่อนหน้า
+                                        </button>
+                                        <template x-for="page in totalRequestedByPages" :key="page">
+                                            <button @click="changeRequestedByPage(page)"
+                                                :class="{'bg-indigo-600 text-white border-indigo-600': requestedByCurrentPage === page, 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50': requestedByCurrentPage !== page}"
+                                                class="px-3 py-1.5 border rounded-md font-medium transition" x-text="page">
+                                            </button>
+                                        </template>
+                                        <button @click="changeRequestedByPage(requestedByCurrentPage + 1)" :disabled="requestedByCurrentPage === totalRequestedByPages || totalRequestedByPages === 0" class="px-3 py-1.5 border border-gray-300 rounded-md bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
                                             ถัดไป <i class="fa-solid fa-chevron-right"></i>
                                         </button>
                                     </div>
@@ -3150,6 +3245,141 @@
         </div>
     </div>
 
+    <!-- Modal Form for Add / Edit Requested By -->
+    <div x-show="showRequestedByModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto" style="display: none;">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden">
+            <div class="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+                <h3 class="font-bold text-lg" x-text="isRequestedByEditMode ? 'Edit Requested By' : 'Add New Requested By'"></h3>
+                <button @click="showRequestedByModal = false" class="text-gray-300 hover:text-white text-xl">&times;</button>
+            </div>
+
+            <div class="p-6 overflow-y-auto flex-1 space-y-4">
+                <template x-for="col in requestedByColumns" :key="col">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1" x-text="col"></label>
+                        <input type="text" x-model="requestedByForm[col]" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                </template>
+            </div>
+
+            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3">
+                <button @click="showRequestedByModal = false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">Cancel</button>
+                <button @click="saveRequestedBy()" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition">Save Record</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Warning Popup: Requested By required fields missing -->
+    <div x-show="showRequestedByValidationWarningModal" x-transition class="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" style="display: none;">
+        <div x-show="showRequestedByValidationWarningModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4">
+            <div class="w-16 h-16 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mx-auto text-2xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="space-y-2">
+                <h3 class="font-bold text-lg text-slate-800">กรุณากรอกข้อมูลให้ครบถ้วน</h3>
+                <p class="text-sm text-gray-500">กรุณาระบุข้อมูลในคอลัมน์ต่อไปนี้ก่อนบันทึกข้อมูล Requested By:</p>
+                <ul class="space-y-1.5">
+                    <template x-for="field in missingRequestedByRequiredFields" :key="field">
+                        <li class="flex items-center justify-center space-x-2 text-sm font-semibold text-amber-600 bg-amber-50 rounded-lg py-1.5">
+                            <i class="fa-solid fa-circle-exclamation text-xs"></i>
+                            <span x-text="field"></span>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+            <button @click="showRequestedByValidationWarningModal = false" class="w-full px-4 py-2.5 bg-amber-500 text-white rounded-lg text-sm font-semibold hover:bg-amber-600 transition">รับทราบ</button>
+        </div>
+    </div>
+
+    <!-- Modal Confirmation Popup for Delete Requested By -->
+    <div x-show="showRequestedByDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style="display: none;">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center space-y-4">
+            <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="font-bold text-lg text-slate-800">ยืนยันการลบรายการ</h3>
+            <p class="text-sm text-gray-600">คุณแน่ใจหรือไม่ว่าต้องการลบ Requested By: <strong class="text-slate-800" x-text="requestedByToDelete ? requestedByToDelete['Requested By'] : ''"></strong> นี้?</p>
+            <div class="flex justify-center space-x-3 pt-2">
+                <button @click="showRequestedByDeleteModal = false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">ยกเลิก</button>
+                <button @click="deleteRequestedBy()" class="px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-700 transition">ยืนยันการลบ</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmation Popup for Bulk Delete Requested By -->
+    <div x-show="showRequestedByBulkDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style="display: none;">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center space-y-4">
+            <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+                <i class="fa-solid fa-trash-can"></i>
+            </div>
+            <h3 class="font-bold text-lg text-slate-800">ยืนยันการลบรายการที่เลือก</h3>
+            <p class="text-sm text-gray-600">คุณแน่ใจหรือไม่ว่าต้องการลบ Requested By ที่เลือกจำนวน <strong class="text-rose-600" x-text="selectedRequestedBys.length"></strong> รายการ?</p>
+            <div class="flex justify-center space-x-3 pt-2">
+                <button @click="showRequestedByBulkDeleteModal = false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">ยกเลิก</button>
+                <button @click="executeBulkDeleteRequestedBy()" class="px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-700 transition">ยืนยันการลบทั้งหมด</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmation Popup for Import Requested By CSV -->
+    <div x-show="showRequestedByImportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style="display: none;">
+        <div class="bg-white rounded-xl shadow-xl max-w-lg w-full p-6 space-y-4">
+            <div class="flex items-center space-x-3 text-emerald-600">
+                <div class="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center text-xl">
+                    <i class="fa-solid fa-file-arrow-up"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-lg text-slate-800">ยืนยันการนำเข้าข้อมูล CSV</h3>
+                    <p class="text-xs text-gray-500">ตรวจสอบรายละเอียดก่อนบันทึกลงระบบ</p>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-gray-600">ข้อมูลพร้อมนำเข้า:</span>
+                    <strong class="text-emerald-600" x-text="requestedByImportPreviewData.newRows.length + ' รายการ'"></strong>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-gray-600">รายการที่ถูกข้าม (Requested By ซ้ำ):</span>
+                    <strong class="text-rose-600" x-text="requestedByImportPreviewData.duplicateCodes.length + ' รายการ'"></strong>
+                </div>
+            </div>
+
+            <div class="flex justify-end space-x-3 pt-2">
+                <button @click="showRequestedByImportModal = false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">ยกเลิก</button>
+                <button @click="executeImportRequestedByCSV()" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition">ยืนยันการ Import</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Success Result Popup (Requested By Import) -->
+    <div x-show="showRequestedByImportResultModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style="display: none;">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center space-y-4">
+            <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+                <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <h3 class="font-bold text-lg text-slate-800">นำเข้าข้อมูลสำเร็จ</h3>
+            <p class="text-sm text-gray-600">บันทึกข้อมูลเรียบร้อยแล้ว <br>จำนวน: <strong class="text-emerald-600" x-text="requestedByImportSuccessCount + ' รายการ'"></strong></p>
+            <div class="flex justify-center space-x-3 pt-2">
+                <button @click="showRequestedByImportResultModal = false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">ปิด</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Error Result Popup (Requested By Import) -->
+    <div x-show="showRequestedByImportErrorModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style="display: none;">
+        <div class="bg-white rounded-xl shadow-xl max-w-md w-full p-6 text-center space-y-4">
+            <div class="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h3 class="font-bold text-lg text-slate-800">ไม่สามารถนำเข้าข้อมูลได้</h3>
+            <p class="text-sm text-gray-600">ไม่มีข้อมูลใหม่ถูกนำเข้า เนื่องจาก Requested By ซ้ำทั้งหมด</p>
+            <div class="flex justify-center pt-2">
+                <button @click="showRequestedByImportErrorModal = false" class="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">ปิด</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase Configuration -->
     <script>
         // TODO: แทนที่ค่าด้านล่างด้วยค่า config จากโปรเจกต์ Firebase ของคุณเอง
@@ -3249,16 +3479,12 @@
                     "Loss"
                 ],
 
-                requestedByRegionOptions: [
-                    "ภาคเหนือ",
-                    "ภาคกลาง",
-                    "ภาคอิสาน",
-                    "ภาคตะวันออก",
-                    "เขตกรุงเทพฯ ปริมณฑล (1)",
-                    "เขตกรุงเทพฯ ปริมณฑล (2)",
-                    "ภาคใต้",
-                    "สำนักงานใหญ่"
-                ],
+                // ตัวเลือกช่อง Requested By: ดึงมาจาก Master Data > Requested By (คอลัมน์ Requested By) แทนค่าคงที่เดิม
+                get requestedByRegionOptions() {
+                    return this.requestedBys
+                        .map(r => r['Requested By'])
+                        .filter(name => name && String(name).trim() !== '');
+                },
 
                 transferUseOptions: [
                    "11101-วงศ์สว่าง",
@@ -5556,6 +5782,28 @@
                 modelImportPreviewData: { newRows: [], duplicateCodes: [] },
                 modelImportSuccessCount: 0,
 
+                // ===== Requested By Master Data =====
+                requestedByColumns: ['Requested By'],
+                requestedBys: [],
+                requestedByForm: {},
+                isRequestedByEditMode: false,
+                requestedByEditIndex: null,
+                showRequestedByModal: false,
+                showRequestedByDeleteModal: false,
+                showRequestedByBulkDeleteModal: false,
+                showRequestedByValidationWarningModal: false,
+                missingRequestedByRequiredFields: [],
+                requestedByToDelete: null,
+                selectedRequestedBys: [],
+                requestedBySearchQuery: '',
+                requestedByCurrentPage: 1,
+                requestedByItemsPerPage: 20,
+                showRequestedByImportModal: false,
+                showRequestedByImportResultModal: false,
+                showRequestedByImportErrorModal: false,
+                requestedByImportPreviewData: { newRows: [], duplicateCodes: [] },
+                requestedByImportSuccessCount: 0,
+
                 columns: [
                     'Asset Code', 'Asset Name', 'Asset Type ID', 'Asset Description', 
                     'Serial No', 'Tag Barcode', 'Branch Code', 'Product ID', 
@@ -5662,6 +5910,11 @@
                     return [];
                 },
 
+                // ค่าเริ่มต้น (seed) ใช้ครั้งแรกเท่านั้น สำหรับข้อมูล Requested By
+                getDefaultRequestedBys() {
+                    return [];
+                },
+
                 // Helper กลาง: ใช้ตรวจจับ error จาก Firebase ทุกจุด แล้วโชว์ให้เห็นแทนที่จะเงียบหาย
                 handleDbError(context, error) {
                     console.error(`[Firebase Error] ${context}:`, error);
@@ -5746,6 +5999,13 @@
                         }
                     }).catch((error) => this.handleDbError('read models (seed check)', error));
 
+                    db.ref('requestedBys').once('value').then((snap) => {
+                        if (!snap.exists()) {
+                            db.ref('requestedBys').set(this.getDefaultRequestedBys().map(encodeAssetKeys))
+                                .catch((error) => this.handleDbError('seed requestedBys', error));
+                        }
+                    }).catch((error) => this.handleDbError('read requestedBys (seed check)', error));
+
                     // ฟังการเปลี่ยนแปลงข้อมูลแบบเรียลไทม์
                     db.ref('assets').on('value', (snap) => {
                         const val = snap.val();
@@ -5788,6 +6048,12 @@
                         const rawList = val ? (Array.isArray(val) ? val : Object.values(val)) : [];
                         this.models = rawList.map(decodeAssetKeys);
                     }, (error) => this.handleDbError('listen models', error));
+
+                    db.ref('requestedBys').on('value', (snap) => {
+                        const val = snap.val();
+                        const rawList = val ? (Array.isArray(val) ? val : Object.values(val)) : [];
+                        this.requestedBys = rawList.map(decodeAssetKeys);
+                    }, (error) => this.handleDbError('listen requestedBys', error));
 
                     db.ref('users/validUsers').on('value', (snap) => {
                         const val = snap.val();
@@ -7869,6 +8135,255 @@
                         this.showModelImportErrorModal = true;
                     }
                     this.modelImportPreviewData = { newRows: [], duplicateCodes: [] };
+                },
+
+                // ===== Requested By Master Data: CRUD, selection, pagination, import/export =====
+                resetRequestedByForm() {
+                    this.requestedByForm = {};
+                    this.requestedByColumns.forEach(col => this.requestedByForm[col] = '');
+                },
+
+                saveRequestedBysToStorage() {
+                    if (this.requestedBys.length === 0) {
+                        db.ref('requestedBys').remove()
+                            .catch((error) => this.handleDbError('remove requestedBys', error));
+                    } else {
+                        db.ref('requestedBys').set(this.requestedBys.map(encodeAssetKeys))
+                            .catch((error) => this.handleDbError('save requestedBys', error));
+                    }
+                },
+
+                get filteredRequestedBys() {
+                    let list = this.requestedBys;
+                    if (!this.requestedBySearchQuery) return list;
+                    const q = this.requestedBySearchQuery.toLowerCase();
+                    return list.filter(item => {
+                        return Object.values(item).some(val => String(val).toLowerCase().includes(q));
+                    });
+                },
+
+                get totalRequestedByPages() {
+                    return Math.ceil(this.filteredRequestedBys.length / this.requestedByItemsPerPage);
+                },
+
+                get paginatedRequestedBys() {
+                    let start = (this.requestedByCurrentPage - 1) * this.requestedByItemsPerPage;
+                    let end = start + this.requestedByItemsPerPage;
+                    return this.filteredRequestedBys.slice(start, end);
+                },
+
+                get isAllRequestedBysSelected() {
+                    let pageItems = this.paginatedRequestedBys;
+                    if (pageItems.length === 0) return false;
+                    return pageItems.every(item => this.selectedRequestedBys.includes(item));
+                },
+
+                toggleSelectAllRequestedBys() {
+                    let pageItems = this.paginatedRequestedBys;
+                    if (this.isAllRequestedBysSelected) {
+                        this.selectedRequestedBys = this.selectedRequestedBys.filter(item => !pageItems.includes(item));
+                    } else {
+                        pageItems.forEach(item => {
+                            if (!this.selectedRequestedBys.includes(item)) {
+                                this.selectedRequestedBys.push(item);
+                            }
+                        });
+                    }
+                },
+
+                toggleSelectRequestedBy(item) {
+                    if (this.selectedRequestedBys.includes(item)) {
+                        this.selectedRequestedBys = this.selectedRequestedBys.filter(a => a !== item);
+                    } else {
+                        this.selectedRequestedBys.push(item);
+                    }
+                },
+
+                changeRequestedByPage(page) {
+                    if (page >= 1 && page <= this.totalRequestedByPages) {
+                        this.requestedByCurrentPage = page;
+                    }
+                },
+
+                openRequestedByModal() {
+                    this.isRequestedByEditMode = false;
+                    this.resetRequestedByForm();
+                    this.showRequestedByModal = true;
+                },
+
+                editRequestedBy(item) {
+                    this.isRequestedByEditMode = true;
+                    this.requestedByEditIndex = this.requestedBys.findIndex(a => a === item);
+                    this.requestedByForm = { ...item };
+                    this.showRequestedByModal = true;
+                },
+
+                saveRequestedBy() {
+                    // ตรวจสอบว่าช่อง Requested By ว่างหรือไม่
+                    let missing = [];
+                    if (!this.requestedByForm['Requested By'] || String(this.requestedByForm['Requested By']).trim() === '') {
+                        missing.push('Requested By');
+                    }
+                    if (missing.length > 0) {
+                        this.missingRequestedByRequiredFields = missing;
+                        this.showRequestedByValidationWarningModal = true;
+                        return;
+                    }
+
+                    // ตรวจสอบ Requested By ซ้ำ (ยกเว้นแถวที่กำลังแก้ไขอยู่)
+                    let name = String(this.requestedByForm['Requested By']).trim();
+                    let duplicate = this.requestedBys.some((b, idx) => {
+                        if (this.isRequestedByEditMode && idx === this.requestedByEditIndex) return false;
+                        return String(b['Requested By']).trim() === name;
+                    });
+                    if (duplicate) {
+                        this.missingRequestedByRequiredFields = ['Requested By (ซ้ำกับข้อมูลที่มีอยู่แล้ว)'];
+                        this.showRequestedByValidationWarningModal = true;
+                        return;
+                    }
+
+                    if (this.isRequestedByEditMode) {
+                        this.requestedBys[this.requestedByEditIndex] = { ...this.requestedByForm };
+                        this.logAction('EDIT', name, `แก้ไขข้อมูล Requested By: ${name}`);
+                    } else {
+                        this.requestedBys.unshift({ ...this.requestedByForm });
+                        this.logAction('ADD', name, `เพิ่ม Requested By ใหม่: ${name}`);
+                    }
+                    this.saveRequestedBysToStorage();
+                    this.showRequestedByModal = false;
+                },
+
+                confirmDeleteRequestedBy(item) {
+                    this.requestedByToDelete = item;
+                    this.showRequestedByDeleteModal = true;
+                },
+
+                deleteRequestedBy() {
+                    if (this.requestedByToDelete) {
+                        let name = this.requestedByToDelete['Requested By'] || '';
+                        this.requestedBys = this.requestedBys.filter(a => a !== this.requestedByToDelete);
+                        this.selectedRequestedBys = this.selectedRequestedBys.filter(a => a !== this.requestedByToDelete);
+                        this.saveRequestedBysToStorage();
+                        this.logAction('DELETE', name, `ลบ Requested By: ${name}`);
+                        this.showRequestedByDeleteModal = false;
+                        this.requestedByToDelete = null;
+                    }
+                },
+
+                confirmBulkDeleteRequestedBy() {
+                    if (this.currentUser !== 'admin' || this.selectedRequestedBys.length === 0) return;
+                    this.showRequestedByBulkDeleteModal = true;
+                },
+
+                executeBulkDeleteRequestedBy() {
+                    if (this.currentUser === 'admin' && this.selectedRequestedBys.length > 0) {
+                        let count = this.selectedRequestedBys.length;
+                        let names = this.selectedRequestedBys.map(a => a['Requested By'] || 'N/A').join(', ');
+                        this.requestedBys = this.requestedBys.filter(a => !this.selectedRequestedBys.includes(a));
+                        this.selectedRequestedBys = [];
+                        this.saveRequestedBysToStorage();
+                        this.logAction('DELETE', 'BULK-DELETE', `ลบ Requested By แบบกลุ่มจำนวน ${count} รายการ (Requested By: ${names})`);
+                        this.showRequestedByBulkDeleteModal = false;
+                    }
+                },
+
+                exportRequestedByCSV() {
+                    let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+                    csvContent += this.requestedByColumns.join(",") + "\r\n";
+                    this.filteredRequestedBys.forEach(row => {
+                        let rowData = this.requestedByColumns.map(col => `"${(row[col] || '').toString().replace(/"/g, '""')}"`);
+                        csvContent += rowData.join(",") + "\r\n";
+                    });
+                    let encodedUri = encodeURI(csvContent);
+                    let link = document.createElement("a");
+                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("download", "requested_by_master_export.csv");
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                },
+
+                downloadRequestedByTemplate() {
+                    let headerRow = this.requestedByColumns;
+                    let exampleRow = this.requestedByColumns.map(col => col === 'Requested By' ? 'เช่น สมชาย ใจดี' : '');
+                    this.downloadCSVTemplate(headerRow, exampleRow, 'RequestedBy_Import_Template.csv');
+
+                    this.logAction('EXPORT', 'TEMPLATE-DOWNLOAD', 'ดาวน์โหลด Template เปล่าสำหรับ Import ข้อมูล Requested By');
+                },
+
+                previewImportRequestedByCSV(event) {
+                    let file = event.target.files[0];
+                    if (!file) return;
+                    let reader = new FileReader();
+                    reader.onload = (e) => {
+                        let text = e.target.result;
+                        let lines = text.split(/\r\n|\n/).filter(line => line.trim() !== '');
+                        if (lines.length < 2) {
+                            alert('CSV file is empty or missing data rows.');
+                            event.target.value = '';
+                            return;
+                        }
+                        let parseCSVLine = (line) => {
+                            let result = [];
+                            let startValue = 0;
+                            let inQuotes = false;
+                            for (let i = 0; i < line.length; i++) {
+                                if (line[i] === '"') inQuotes = !inQuotes;
+                                else if (line[i] === ',' && !inQuotes) {
+                                    result.push(line.substring(startValue, i).replace(/^"|"$/g, '').replace(/""/g, '"'));
+                                    startValue = i + 1;
+                                }
+                            }
+                            result.push(line.substring(startValue).replace(/^"|"$/g, '').replace(/""/g, '"'));
+                            return result;
+                        };
+
+                        let headers = parseCSVLine(lines[0]);
+                        let newRows = [];
+                        let existingCodeSet = new Set(this.requestedBys.map(a => a['Requested By']).filter(Boolean));
+                        let fileCodeSet = new Set();
+                        let duplicateCodes = [];
+
+                        for (let i = 1; i < lines.length; i++) {
+                            let data = parseCSVLine(lines[i]);
+                            let obj = {};
+                            this.requestedByColumns.forEach(col => {
+                                let idx = headers.indexOf(col);
+                                obj[col] = (idx !== -1 && data[idx] !== undefined) ? data[idx] : '';
+                            });
+
+                            let code = obj['Requested By'] ? obj['Requested By'].trim() : '';
+                            if (code !== '') {
+                                if (existingCodeSet.has(code) || fileCodeSet.has(code)) {
+                                    duplicateCodes.push(code);
+                                    continue;
+                                }
+                                fileCodeSet.add(code);
+                            }
+                            newRows.push(obj);
+                        }
+
+                        this.requestedByImportPreviewData = { newRows, duplicateCodes };
+                        this.showRequestedByImportModal = true;
+                        event.target.value = '';
+                    };
+                    reader.readAsText(file, 'UTF-8');
+                },
+
+                executeImportRequestedByCSV() {
+                    if (this.requestedByImportPreviewData.newRows.length > 0) {
+                        this.requestedByImportSuccessCount = this.requestedByImportPreviewData.newRows.length;
+                        this.requestedBys = this.requestedByImportPreviewData.newRows.concat(this.requestedBys);
+                        this.saveRequestedBysToStorage();
+                        this.logAction('IMPORT', 'BATCH-IMPORT', `นำเข้าข้อมูล Requested By ผ่านไฟล์ CSV จำนวน ${this.requestedByImportSuccessCount} รายการ`);
+                        this.showRequestedByImportModal = false;
+                        this.showRequestedByImportResultModal = true;
+                        this.requestedByCurrentPage = 1;
+                    } else {
+                        this.showRequestedByImportModal = false;
+                        this.showRequestedByImportErrorModal = true;
+                    }
+                    this.requestedByImportPreviewData = { newRows: [], duplicateCodes: [] };
                 },
 
                 openUserModal() {
