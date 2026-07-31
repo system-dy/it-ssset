@@ -59,7 +59,7 @@
                มีช่องว่างส่วนเกินด้านบนก่อนเนื้อหาแบบฟอร์ม จึงต้องรีเซ็ตเป็น 0 */
             #requisitionPrintArea > * + * { margin-top: 0 !important; }
             @page { size: A4 landscape; margin: 12mm; }
-            @page requisitionPage { size: A4 portrait; margin: 12mm; }
+            @page requisitionPage { size: A4 portrait; margin: 7mm; }
         }
 
         /* ===== Requisition Success Popup Animations ===== */
@@ -1469,12 +1469,24 @@
 
                                         <template x-if="col === 'Branch Code'">
                                             <div>
-                                                <input type="text" x-model="requisitionScanForm[col]" list="requisitionScanBranchCodeList" placeholder="เลือกหรือพิมพ์ข้อมูล..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                                                <input type="text" x-model="requisitionScanForm[col]" @input="requisitionScanForm['GLBranch'] = glBranchByBranchCode(requisitionScanForm['Branch Code']); requisitionScanForm['Branch Name'] = branchNameByBranchCode(requisitionScanForm['Branch Code'])" list="requisitionScanBranchCodeList" placeholder="เลือกหรือพิมพ์ข้อมูล..." class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
                                                 <datalist id="requisitionScanBranchCodeList">
                                                     <template x-for="opt in requisitionBranchCodeOptions" :key="opt">
                                                         <option :value="opt"></option>
                                                     </template>
                                                 </datalist>
+                                            </div>
+                                        </template>
+
+                                        <template x-if="col === 'Branch Name'">
+                                            <div>
+                                                <input type="text" :value="branchNameByBranchCode(requisitionScanForm['Branch Code'])" readonly placeholder="จะแสดงอัตโนมัติจาก Branch Code" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-100 text-gray-600 cursor-not-allowed">
+                                            </div>
+                                        </template>
+
+                                        <template x-if="col === 'GLBranch'">
+                                            <div>
+                                                <input type="text" :value="glBranchByBranchCode(requisitionScanForm['Branch Code'])" readonly placeholder="จะแสดงอัตโนมัติจาก Branch Code" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-gray-100 text-gray-600 cursor-not-allowed">
                                             </div>
                                         </template>
 
@@ -1493,7 +1505,7 @@
                                             </div>
                                         </template>
 
-                                        <template x-if="!['Asset Type','Asset Type ID','Requested By','Requested Date','Start Warranty Date','End Warranty Date','Product ID','Seller Supplier Code','Service Supplier Code','Branch Code','Status','Operation Device Status'].includes(col)">
+                                        <template x-if="!['Asset Type','Asset Type ID','Requested By','Requested Date','Start Warranty Date','End Warranty Date','Product ID','Seller Supplier Code','Service Supplier Code','Branch Code','Branch Name','GLBranch','Status','Operation Device Status'].includes(col)">
                                             <input type="text" x-model="requisitionScanForm[col]" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                                         </template>
                                     </div>
@@ -1524,7 +1536,7 @@
                                 </thead>
                                 <tbody class="divide-y divide-gray-200">
                                     <template x-for="(item, index) in paginatedRequisitionItems" :key="item._uid">
-                                        <tr class="hover:bg-gray-50">
+                                        <tr class="hover:bg-gray-50" :class="(item['Serial No'] && item['Serial No'].trim() !== '' && findDuplicateSerialsInRequisitionItems().includes(item['Serial No'].trim())) ? 'bg-rose-50' : ''">
                                             <td class="px-4 py-2 text-gray-500 font-medium" x-text="(requisitionItemsCurrentPage - 1) * requisitionItemsPerPage + index + 1"></td>
                                             <template x-for="col in columns" :key="col">
                                                 <td class="px-4 py-2">
@@ -1535,7 +1547,7 @@
                                                         <input type="text" x-model="item[col]" @input="item['Asset Type'] = assetTypeDescriptionById(item['Asset Type ID'])" list="requisitionAssetTypeIdListRow" class="w-full min-w-[9rem] px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                                                     </template>
                                                     <template x-if="col === 'Serial No' || col === 'Tag Barcode'">
-                                                        <input type="text" x-model="item[col]" class="w-full min-w-[9rem] px-2 py-1.5 border border-gray-300 rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                                        <input type="text" x-model="item[col]" @change="col === 'Serial No' ? onRequisitionSerialNoChange(item) : null" :class="(col === 'Serial No' && item['Serial No'] && item['Serial No'].trim() !== '' && findDuplicateSerialsInRequisitionItems().includes(item['Serial No'].trim())) ? 'border-rose-500 ring-1 ring-rose-300' : 'border-gray-300'" class="w-full min-w-[9rem] px-2 py-1.5 border rounded-md text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500">
                                                     </template>
                                                     <template x-if="col === 'Requested Date'">
                                                         <input type="date" x-model="item[col]" class="w-full min-w-[9rem] px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
@@ -1558,7 +1570,13 @@
                                                         <input type="text" :value="serviceSupplierCodeBySellerCode(item['Seller Supplier Code'])" readonly class="w-full min-w-[9rem] px-2 py-1.5 border border-gray-300 rounded-md text-sm bg-gray-100 text-gray-600 cursor-not-allowed">
                                                     </template>
                                                     <template x-if="col === 'Branch Code'">
-                                                        <input type="text" x-model="item[col]" list="requisitionBranchCodeListRow" class="w-full min-w-[9rem] px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                                        <input type="text" x-model="item[col]" @input="item['GLBranch'] = glBranchByBranchCode(item['Branch Code']); item['Branch Name'] = branchNameByBranchCode(item['Branch Code'])" list="requisitionBranchCodeListRow" class="w-full min-w-[9rem] px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                                    </template>
+                                                    <template x-if="col === 'Branch Name'">
+                                                        <input type="text" :value="branchNameByBranchCode(item['Branch Code'])" readonly class="w-full min-w-[9rem] px-2 py-1.5 border border-gray-300 rounded-md text-sm bg-gray-100 text-gray-600 cursor-not-allowed">
+                                                    </template>
+                                                    <template x-if="col === 'GLBranch'">
+                                                        <input type="text" :value="glBranchByBranchCode(item['Branch Code'])" readonly class="w-full min-w-[9rem] px-2 py-1.5 border border-gray-300 rounded-md text-sm bg-gray-100 text-gray-600 cursor-not-allowed">
                                                     </template>
                                                     <template x-if="col === 'Status'">
                                                         <select x-model="item[col]" class="w-full min-w-[9rem] px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
@@ -1569,7 +1587,7 @@
                                                         <input type="text" x-model="item[col]" list="requisitionOperationDeviceStatusListRow" class="w-full min-w-[9rem] px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                                                     </template>
 
-                                                    <template x-if="!['Asset Type','Asset Type ID','Serial No','Tag Barcode','Requested Date','Warehouse','Product ID','Seller Supplier Code','Service Supplier Code','Branch Code','Status','Operation Device Status'].includes(col)">
+                                                    <template x-if="!['Asset Type','Asset Type ID','Serial No','Tag Barcode','Requested Date','Warehouse','Product ID','Seller Supplier Code','Service Supplier Code','Branch Code','Branch Name','GLBranch','Status','Operation Device Status'].includes(col)">
                                                         <input type="text" x-model="item[col]" class="w-full min-w-[9rem] px-2 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                                                     </template>
                                                 </td>
@@ -1629,6 +1647,11 @@
                                 <option :value="opt"></option>
                             </template>
                         </datalist>
+                        <datalist id="requisitionGLBranchListRow">
+                            <template x-for="opt in requisitionGLBranchOptions" :key="opt">
+                                <option :value="opt"></option>
+                            </template>
+                        </datalist>
                         <datalist id="requisitionOperationDeviceStatusListRow">
                             <option value="NM"></option>
                         </datalist>
@@ -1657,8 +1680,12 @@
                                 <label class="block text-xs font-semibold text-gray-700 mb-1">หมายเหตุ (Note)</label>
                                 <input type="text" x-model="requisitionForm.note" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                             </div>
-                            <div class="md:col-span-3 flex justify-end">
-                                <button @click="submitRequisition()" :disabled="requisitionItems.length === 0 || !requisitionForm.requestedBy.trim() || !requisitionForm.requestDept.trim()" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-2">
+                            <div class="md:col-span-3 flex flex-col items-end space-y-2">
+                                <p x-show="hasDuplicateRequisitionSerials" class="text-xs font-medium text-rose-600 flex items-center space-x-1" style="display: none;">
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                    <span>พบ Serial No ซ้ำกันในรายการ ไม่สามารถบันทึกใบเบิกได้ กรุณาแก้ไข Serial No ที่ซ้ำก่อน</span>
+                                </p>
+                                <button @click="submitRequisition()" :disabled="requisitionItems.length === 0 || !requisitionForm.requestedBy.trim() || !requisitionForm.requestDept.trim() || hasDuplicateRequisitionSerials" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center space-x-2">
                                     <i class="fa-solid fa-paper-plane"></i><span>บันทึกใบเบิก</span>
                                 </button>
                             </div>
@@ -1719,6 +1746,7 @@
                                             <td class="px-4 py-2.5 text-center" x-text="req.items.length"></td>
                                             <td class="px-4 py-2.5 text-center">
                                                 <button @click="viewRequisitionDetail(req)" class="text-indigo-600 hover:text-indigo-900 mx-1 p-1" title="ดูรายละเอียด"><i class="fa-solid fa-eye"></i></button>
+                                                <button @click="exportRequisitionToExcel(req)" class="text-emerald-600 hover:text-emerald-900 mx-1 p-1" title="Export to Excel"><i class="fa-solid fa-file-excel"></i></button>
                                                 <button @click="confirmDeleteRequisition(req)" class="text-rose-600 hover:text-rose-900 mx-1 p-1" title="ลบ"><i class="fa-solid fa-trash"></i></button>
                                             </td>
                                         </tr>
@@ -1903,6 +1931,27 @@
         </div>
     </div>
 
+    <!-- Modal Confirm Popup: Duplicate Serial No found when adding new asset -->
+    <div x-show="showDuplicateSerialModal" x-transition class="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" style="display: none;">
+        <div x-show="showDuplicateSerialModal" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center space-y-4">
+            <div class="w-16 h-16 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mx-auto text-2xl">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="space-y-2">
+                <h3 class="font-bold text-lg text-slate-800">พบ Serial No ซ้ำในระบบ</h3>
+                <p class="text-sm text-gray-500">
+                    Serial No <span class="font-mono font-semibold text-slate-800" x-text="form['Serial No']"></span>
+                    มีอยู่แล้วในระบบ (<span x-text="pendingDuplicateAsset ? (pendingDuplicateAsset['Asset Name'] || '-') : ''"></span>)<br>
+                    ต้องการอัปเดตข้อมูลทับรายการเดิมหรือไม่?
+                </p>
+            </div>
+            <div class="flex space-x-3">
+                <button @click="cancelOverwriteDuplicateAsset()" class="flex-1 px-4 py-2.5 bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300 transition">ยกเลิก</button>
+                <button @click="confirmOverwriteDuplicateAsset()" class="flex-1 px-4 py-2.5 bg-amber-500 text-white rounded-lg text-sm font-semibold hover:bg-amber-600 transition">ยืนยัน อัปเดตทับ</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal Form for Add / Edit User -->
     <div x-show="showUserModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto" style="display: none;">
         <div class="bg-white rounded-xl shadow-xl max-w-lg w-full overflow-hidden my-8">
@@ -2063,111 +2112,62 @@
                     </div>
                 </div>
 
-                <!-- ================= PRINT VIEW (ตามแบบฟอร์ม Excel แนบ) ================= -->
+                <!-- ================= PRINT VIEW (แบบฟอร์ม Excel แนบ: A4 แนวตั้ง) ================= -->
                 <div class="hidden print:block text-slate-900" style="font-family:'Sarabun', sans-serif;">
-                    <!-- แบ่งพิมพ์ทีละ 25 แถวต่อหน้า เมื่อรายการเกิน 25 รายการ (เดิม fix 25 แถวหน้าเดียว) -->
                     <template x-for="pageIdx in requisitionPrintPages()" :key="'reqpage'+pageIdx">
-                    <div :style="pageIdx < requisitionPrintPages().length - 1 ? 'page-break-after: always;' : ''">
-
-                    <!-- Header: Logo (กึ่งกลางด้านบน) + ชื่อฟอร์ม -->
-                    <div style="text-align:center; margin-bottom:2mm;">
-                        <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAbQAAABuCAMAAAB4OBaJAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAEvUExURZTVAJPVAJbWCK7gQKHaIP///8nqgOT0v8nqf6aZBLZqB8k1CrlkB6uLBJjIAZ60AsJKCaOmA5XOALF3BtQUDNoADa6FBaWgA8c8CbB+Bc8hC6mSBM0oC+M9CuAmC6CtAsRDCdEbC71XCOEuC+16BuljCN0XDNwPDO6CBv3lAf/0APjGApnBAZy6AvGZBfOoBNsIDfe/A/KgBLRxBtgHDbxeB+RFCe+JBv7sAPWvBMovCva3A/nOAuprB+tyB98fC/zdAeI1CudUCfCRBeZMCehcCKfdMLzlYNbvn9rxp8bpeLHhSNPul/X75+v3z6TcKPH63/z+993yr7/maPrWArjjWJrYEJ3ZGKveOOf2x+741/j878zrh79QCNDtj9UNDLXiUOHzt8LncJPWAJPWAM8e37kAAABldFJOU9///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////6e/6LHw+QAAAAlwSFlzAAAXEQAAFxEByibzPwAADpxJREFUeF7tnftf08wSxm2LrbaIClRURBQVsYLyKgrK8f5KgZZLQQoCcjv+/3/D2c1O7jO7s2ko9Hzy/YWkaRrYp/vs7OwkXLmSy+g1MtF6EFe0fOHy0ad+tYwormh9Vy8fRfWrZUQJiFa6dqnIRCMJiHZNbV0WMtFIMtF6kEy0HiQTrQfJROtBMtF6kEy0HiQTrQfJROtBMtF6kA5Fu16uVCr9NwZgN00y0Ug4ot0UwoS4VS7fFq8PDg1XFcN31DujDI4IypL+SuWu/HlvZOQmHDSQiUbCEa0M0oS4PzrwQP4cG3sofwzBe4Hx0fKjyn15AONxZWJoZBDeSpGJRsIRTTT+k6cBno1NyqYX3ez51ItarfZSyDY8DW/O3R565Khp5MHEnRk4ByMTjYQh2k3RwK+ENkFeP5HNPvuP2nsjtkfkW2+/vTsnD7C5/845DyMTjYQhmnDHWdmhQryQnW0MdqbE9kxu/J07xFkxPCHHxziZaCQM0YQ7vgd1AsyL9p5c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" alt="Big C" style="height:11mm; margin:0 auto 1.5mm auto; display:block;">
-                        <h2 style="font-size:13pt; font-weight:700; margin:0;">แบบฟอร์มการขอเบิกอุปกรณ์ (MIS Service Co บางพลี)</h2>
-                    </div>
-
-                    <!-- แถบข้อมูลใบเบิก (ตามแบบฟอร์ม Excel: เลขที่ใบเบิก + วัน/เดือน/ปี บรรทัดเดียว กึ่งกลาง) -->
-                    <div style="text-align:center; font-size:9pt; margin-bottom:2mm; padding:1mm 0;">
-                        เลขที่ใบเบิก: <span style="font-weight:700;" x-text="viewRequisition ? viewRequisition.docNo : ''"></span>
-                        &nbsp;&nbsp;&nbsp;&nbsp;
-                        วัน / เดือน / ปี (DD/MM/YY): <span style="font-weight:700;" x-text="viewRequisition ? viewRequisition.createdAt : ''"></span>
-                        <template x-if="requisitionPrintPages().length > 1">
-                            <span>&nbsp;&nbsp;&nbsp;&nbsp;หน้า <span style="font-weight:700;" x-text="pageIdx + 1"></span>/<span style="font-weight:700;" x-text="requisitionPrintPages().length"></span></span>
-                        </template>
-                    </div>
-
-                    <!-- ตารางรายการ 25 แถวต่อหน้า -->
-                    <table style="width:100%; border-collapse:collapse; table-layout:fixed; font-size:8pt;">
-                        <colgroup>
-                            <col style="width:7%;">
-                            <col style="width:29%;">
-                            <col style="width:29%;">
-                            <col style="width:7%;">
-                            <col style="width:28%;">
-                        </colgroup>
-                        <thead>
-                            <tr>
-                                <th style="border:0.75pt solid #000; padding:0.8mm; height:6mm; font-weight:700; text-align:center;">ลำดับ</th>
-                                <th style="border:0.75pt solid #000; padding:0.8mm; height:6mm; font-weight:700; text-align:center;">รายการ</th>
-                                <th style="border:0.75pt solid #000; padding:0.8mm; height:6mm; font-weight:700; text-align:center;">รหัสอุปกรณ์ (S/N)</th>
-                                <th style="border:0.75pt solid #000; padding:0.8mm; height:6mm; font-weight:700; text-align:center;">จำนวน</th>
-                                <th style="border:0.75pt solid #000; padding:0.8mm; height:6mm; font-weight:700; text-align:center;">หมายเหตุ</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <template x-for="(slot, rowIdx) in Array.from({length:25})" :key="'printrow'+pageIdx+'_'+rowIdx">
-                                <tr>
-                                    <td style="border:0.75pt solid #000; padding:0.8mm; height:6mm; text-align:center;" x-text="pageIdx*25 + rowIdx + 1"></td>
-                                    <td style="border:0.75pt solid #000; padding:0.8mm 0.8mm 0.8mm 2mm; text-align:left;" x-text="(viewRequisition && viewRequisition.items[pageIdx*25+rowIdx]) ? (viewRequisition.items[pageIdx*25+rowIdx]['Asset Type'] || viewRequisition.items[pageIdx*25+rowIdx]['Product ID'] || '-') : ''"></td>
-                                    <td style="border:0.75pt solid #000; padding:0.8mm; text-align:center;" x-text="(viewRequisition && viewRequisition.items[pageIdx*25+rowIdx]) ? viewRequisition.items[pageIdx*25+rowIdx]['Serial No'] : ''"></td>
-                                    <td style="border:0.75pt solid #000; padding:0.8mm; text-align:center;" x-text="(viewRequisition && viewRequisition.items[pageIdx*25+rowIdx]) ? viewRequisition.items[pageIdx*25+rowIdx]['Quantity'] : ''"></td>
-                                    <td style="border:0.75pt solid #000; padding:0.8mm;">&nbsp;</td>
-                                </tr>
-                            </template>
-                            <template x-if="pageIdx === requisitionPrintPages().length - 1">
-                                <tr>
-                                    <td style="border:0.75pt solid #000; padding:0.8mm; height:6mm; font-weight:700;" colspan="3">รวมทั้งสิ้น</td>
-                                    <td style="border:0.75pt solid #000; padding:0.8mm; text-align:center; font-weight:700;" x-text="viewRequisition ? viewRequisition.items.reduce((s, i) => s + (Number(i['Quantity']) || 0), 0) : 0"></td>
-                                    <td style="border:0.75pt solid #000; padding:0.8mm;">&nbsp;</td>
-                                </tr>
-                            </template>
-                        </tbody>
-                    </table>
-
-                    <template x-if="pageIdx === requisitionPrintPages().length - 1">
-                    <div>
-                    <p style="font-size:8.5pt; margin:8mm 0 0 7%;">ได้ตรวจรับมอบอุปกรณ์ตามจำนวนดังระบุข้างต้นไว้ครบถ้วนเรียบร้อย</p>
-
-                    <div style="display:grid; grid-template-columns:7% 29% 29% 35%; gap:0 3mm; text-align:center; font-size:8.5pt; margin-top:3mm;">
-                        <div></div>
-                        <div>
-                            <p style="font-weight:700; margin:0 0 7mm 0;">ผู้ขอเบิกอุปกรณ์</p>
-                            <p style="margin:4mm 0 0 0;">( <span x-text="viewRequisition ? viewRequisition.requestedBy : ''"></span> )</p>
-                            <p style="margin:1mm 0 0 0;">วันที่ ……. / ……... / ………….</p>
+                    <div class="requisition-a4-page" :style="pageIdx < requisitionPrintPages().length - 1 ? 'page-break-after: always;' : ''">
+                        <!-- Header follows the attached Excel form -->
+                        <div style="text-align:center; margin:0 0 1.5mm 0;">
+                            <img src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QMERXhpZgAATU0AKgAAAAgABAE7AAIAAAATAAABSodpAAQAAAABAAABXpydAAEAAAAmAAAC1uocAAcAAAEMAAAAPgAAAAAc6gAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAREdUIEFydGhpdCBMZWtuZ2FtAAAABZADAAIAAAAUAAACrJAEAAIAAAAUAAACwJKRAAIAAAADMzMAAJKSAAIAAAADMzMAAOocAAcAAAEMAAABoAAAAAAc6gAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMjAyNjowNzozMCAyMToxNjozMAAyMDI2OjA3OjMwIDIxOjE2OjMwAAAARABHAFQAIABBAHIAdABoAGkAdAAgAEwAZQBrAG4AZwBhAG0AAAD/4QQlaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wLwA8P3hwYWNrZXQgYmVnaW49J++7vycgaWQ9J1c1TTBNcENlaGlIenJlU3pOVGN6a2M5ZCc/Pg0KPHg6eG1wbWV0YSB4bWxuczp4PSJhZG9iZTpuczptZXRhLyI+PHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj48cmRmOkRlc2NyaXB0aW9uIHJkZjphYm91dD0idXVpZDpmYWY1YmRkNS1iYTNkLTExZGEtYWQzMS1kMzNkNzUxODJmMWIiIHhtbG5zOmRjPSJodHRwOi8vcHVybC5vcmcvZGMvZWxlbWVudHMvMS4xLyIvPjxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSJ1dWlkOmZhZjViZGQ1LWJhM2QtMTFkYS1hZDMxLWQzM2Q3NTE4MmYxYiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIj48eG1wOkNyZWF0ZURhdGU+MjAyNi0wNy0zMFQyMToxNjozMC4zMjg8L3htcDpDcmVhdGVEYXRlPjwvcmRmOkRlc2NyaXB0aW9uPjxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSJ1dWlkOmZhZjViZGQ1LWJhM2QtMTFkYS1hZDMxLWQzM2Q3NTE4MmYxYiIgeG1sbnM6ZGM9Imh0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvIj48ZGM6Y3JlYXRvcj48cmRmOlNlcSB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPjxyZGY6bGk+REdUIEFydGhpdCBMZWtuZ2FtPC9yZGY6bGk+PC9yZGY6U2VxPg0KCQkJPC9kYzpjcmVhdG9yPjwvcmRmOkRlc2NyaXB0aW9uPjwvcmRmOlJERj48L3g6eG1wbWV0YT4NCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIAogICAgICAgICAgICAgICAg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" alt="Big C" style="height:11mm; margin:0 auto 1mm; display:block;">
+                            <h2 style="font-size:11pt; font-weight:700; margin:0;">แบบฟอร์มการขอเบิกอุปกรณ์ (MIS Service Co บางพลี)</h2>
                         </div>
-                        <div>
-                            <p style="font-weight:700; margin:0 0 7mm 0;">ผู้ส่งอุปกรณ์</p>
-                            <p style="margin:4mm 0 0 0;">(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</p>
-                            <p style="margin:1mm 0 0 0;">วันที่ ……. / ……... / ………….</p>
+                        <div style="display:flex; justify-content:flex-end; font-size:8.5pt; margin:0 0 1.5mm 0;">
+                            วัน / เดือน / ปี (DD/MM/YY): <span style="font-weight:700; min-width:30mm; display:inline-block; border-bottom:0.5pt solid #000; text-align:center;" x-text="viewRequisition ? viewRequisition.createdAt : ''"></span>
                         </div>
+
+                        <table style="width:100%; border-collapse:collapse; table-layout:fixed; font-size:6.8pt; line-height:1.1;">
+                            <colgroup>
+                                <col style="width:5%;"><col style="width:11%;"><col style="width:10%;"><col style="width:11%;"><col style="width:17%;"><col style="width:18%;"><col style="width:10%;"><col style="width:6%;"><col style="width:12%;">
+                            </colgroup>
+                            <thead><tr>
+                                <th style="border:0.5pt solid #000; padding:0.7mm; height:6mm; text-align:center;">ลำดับ</th><th style="border:0.5pt solid #000; padding:0.7mm; text-align:center;">Branch form</th><th style="border:0.5pt solid #000; padding:0.7mm; text-align:center;">Cost Center</th><th style="border:0.5pt solid #000; padding:0.7mm; text-align:center;">Asset FAS</th><th style="border:0.5pt solid #000; padding:0.7mm; text-align:center;">รายการ</th><th style="border:0.5pt solid #000; padding:0.7mm; text-align:center;">รหัสอุปกรณ์ (S/N)</th><th style="border:0.5pt solid #000; padding:0.7mm; text-align:center;">Project Code</th><th style="border:0.5pt solid #000; padding:0.7mm; text-align:center;">จำนวน</th><th style="border:0.5pt solid #000; padding:0.7mm; text-align:center;">หมายเหตุ</th>
+                            </tr></thead>
+                            <tbody>
+                                <template x-for="(slot, rowIdx) in Array.from({length:30})" :key="'printrow'+pageIdx+'_'+rowIdx"><tr>
+                                    <td style="border:0.5pt solid #000; padding:0.5mm; height:5mm; text-align:center;" x-text="pageIdx*30 + rowIdx + 1"></td>
+                                    <td style="border:0.5pt solid #000; padding:0.5mm; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" x-text="(viewRequisition && viewRequisition.items[pageIdx*30+rowIdx]) ? (viewRequisition.items[pageIdx*30+rowIdx]['GLBranch'] || '') : ''"></td>
+                                    <td style="border:0.5pt solid #000; padding:0.5mm; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" x-text="(viewRequisition && viewRequisition.items[pageIdx*30+rowIdx]) ? (viewRequisition.items[pageIdx*30+rowIdx]['Cost Center'] || viewRequisition.items[pageIdx*30+rowIdx]['GLBranch'] || '') : ''"></td>
+                                    <td style="border:0.5pt solid #000; padding:0.5mm; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" x-text="(viewRequisition && viewRequisition.items[pageIdx*30+rowIdx]) ? (viewRequisition.items[pageIdx*30+rowIdx]['Asset FAS'] || viewRequisition.items[pageIdx*30+rowIdx]['Tag Barcode'] || '') : ''"></td>
+                                    <td style="border:0.5pt solid #000; padding:0.5mm; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" x-text="(viewRequisition && viewRequisition.items[pageIdx*30+rowIdx]) ? (viewRequisition.items[pageIdx*30+rowIdx]['Asset Type'] || viewRequisition.items[pageIdx*30+rowIdx]['Asset Description'] || viewRequisition.items[pageIdx*30+rowIdx]['Product ID'] || '') : ''"></td>
+                                    <td style="border:0.5pt solid #000; padding:0.5mm; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" x-text="(viewRequisition && viewRequisition.items[pageIdx*30+rowIdx]) ? viewRequisition.items[pageIdx*30+rowIdx]['Serial No'] : ''"></td>
+                                    <td style="border:0.5pt solid #000; padding:0.5mm; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" x-text="(viewRequisition && viewRequisition.items[pageIdx*30+rowIdx]) ? (viewRequisition.items[pageIdx*30+rowIdx]['Project Code'] || '') : ''"></td>
+                                    <td style="border:0.5pt solid #000; padding:0.5mm; text-align:center;" x-text="(viewRequisition && viewRequisition.items[pageIdx*30+rowIdx]) ? viewRequisition.items[pageIdx*30+rowIdx]['Quantity'] : ''"></td>
+                                    <td style="border:0.5pt solid #000; padding:0.5mm; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" x-text="(viewRequisition && viewRequisition.items[pageIdx*30+rowIdx]) ? (viewRequisition.items[pageIdx*30+rowIdx]['Note'] || '') : ''"></td>
+                                </tr></template>
+                                <template x-if="pageIdx === requisitionPrintPages().length - 1"><tr>
+                                    <td colspan="7" style="border:0.5pt solid #000; padding:0.7mm; height:5mm; font-weight:700;">รวมทั้งสิ้น</td><td style="border:0.5pt solid #000; padding:0.7mm; text-align:center; font-weight:700;" x-text="viewRequisition ? viewRequisition.items.reduce((s, i) => s + (Number(i['Quantity']) || 0), 0) : 0"></td><td style="border:0.5pt solid #000;"></td>
+                                </tr></template>
+                            </tbody>
+                        </table>
+
                         <div>
-                            <p style="font-weight:700; margin:0 0 7mm 0;">ผู้อนุมัติให้ดำเนินการ</p>
-                            <p style="margin:4mm 0 0 0;">(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</p>
-                            <p style="margin:1mm 0 0 0;">วันที่ ……. / ……... / ………….</p>
+                            <div style="font-size:7pt; margin-top:1mm;">&nbsp;</div>
+                            <div style="font-size:7pt;">ได้ตรวจรับมอบอุปกรณ์ตามจำนวนดังระบุข้างต้นไว้ครบถ้วนเรียบร้อย</div>
+                            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6mm; text-align:center; font-size:10pt; margin-top:-2mm;">
+             
+                                <div><div style="height:8mm;"></div><div>ผู้ขอเบิกอุปกรณ์</div><div style="margin-top:9mm;">( <span x-text="viewRequisition ? viewRequisition.requestedBy : ''"></span> )</div><div>วันที่ ……. / ……... / ………….</div></div>
+                                <div><div style="height:8mm;"></div><div>ผู้ส่งอุปกรณ์</div><div style="margin-top:9mm;">(........................................)</div><div>วันที่ ……. / ……... / ………….</div></div>
+                                <div><div style="height:8mm;"></div><div>ผู้อนุมัติให้ดำเนินการ</div><div style="margin-top:9mm;">(........................................)</div><div>วันที่ ……. / ……... / ………….</div></div>
+                               <div><div style="height:-3mm;"></div><div>ผู้ตรวจสอบ (LP)</div><div style="margin-top:9mm;">(........................................)</div><div>วันที่ ……. / ……... / ………….</div></div>
+                            </div>
+                            <div style="font-size:10pt; margin-top:12mm; line-height:1.55;">หมายเหตุ :    <span x-text="(viewRequisition && viewRequisition.items.length) ? [viewRequisition.items[0]['Branch Code'], viewRequisition.items[0]['GLBranch'], viewRequisition.items[0]['Branch Name']].filter(Boolean).join(' - ') : ''"></span></div>
+                                                        <p style="font-size:7pt; text-align:center; margin:4mm 0 0;">เบอรี่ ยุคเกอร์ หรือ BJC ซอยรูเปีย ถนนสุขุมวิท 42 แขวงพระโขนง เขตคลองเตย กทม. 10110 อาคาร B ชั้น 11 แผนก MIS</p>
                         </div>
-                    </div>
-
-                    <!-- ผู้ตรวจสอบ (LP) - จัดตำแหน่งใต้คอลัมน์แรก (B) ตามฟอร์ม Excel ไม่ใช่กึ่งกลางเต็มหน้า -->
-                    <div style="display:grid; grid-template-columns:7% 29% 64%; text-align:center; font-size:8.5pt; margin-top:3mm;">
-                        <div></div>
-                        <div>
-                            <p style="font-weight:700; margin:0 0 7mm 0;">ผู้ตรวจสอบ (LP)</p>
-                            <p style="margin:4mm 0 0 0;">(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</p>
-                            <p style="margin:1mm 0 0 0;">วันที่ ……. / ……... / ………….</p>
-                        </div>
-                        <div></div>
-                    </div>
-
-                    <p style="font-size:8pt; margin:13mm 0 0 0;">หมายเหตุ: เลขที่ใบเบิก <span x-text="viewRequisition ? viewRequisition.docNo : ''"></span> | ผู้ขอเบิก <span x-text="viewRequisition ? viewRequisition.requestedBy : ''"></span> | แผนก/Warehouse <span x-text="viewRequisition ? viewRequisition.requestDept : ''"></span><template x-if="viewRequisition && viewRequisition.note"><span> | <span x-text="viewRequisition.note"></span></span></template></p>
-
-                    <p style="font-size:7.5pt; text-align:center; margin:3mm 0 0 0;">เบอรี่ ยุคเกอร์ หรือ BJC ซอยรูเปีย ถนนสุขุมวิท 42 แขวงพระโขนง เขตคลองเตย กทม. 10110 อาคาร B ชั้น 11 แผนก MIS</p>
-                    </div>
-                    </template>
-
                     </div>
                     </template>
                 </div>
-            </div>
-            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3 print:hidden">
+            </div>            <div class="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3 print:hidden">
+                <button @click="exportRequisitionToExcel(viewRequisition)" x-show="viewRequisition" class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition" style="display: none;"><i class="fa-solid fa-file-excel mr-1"></i>Export Excel</button>
                 <button @click="printRequisitionDetail()" x-show="viewRequisition" class="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition" style="display: none;"><i class="fa-solid fa-print mr-1"></i>พิมพ์</button>
                 <button @click="showRequisitionViewModal = false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">ปิด</button>
             </div>
@@ -2301,12 +2301,12 @@
 
             <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 space-y-2 text-sm">
                 <div class="flex justify-between">
-                    <span class="text-gray-600">ข้อมูลพร้อมนำเข้า:</span>
+                    <span class="text-gray-600">ข้อมูลใหม่ที่จะนำเข้า:</span>
                     <strong class="text-emerald-600" x-text="importPreviewData.newRows.length + ' รายการ'"></strong>
                 </div>
                 <div class="flex justify-between">
-                    <span class="text-gray-600">รายการที่ถูกข้าม (Serial No ซ้ำ):</span>
-                    <strong class="text-rose-600" x-text="importPreviewData.duplicateSerials.length + ' รายการ'"></strong>
+                    <span class="text-gray-600">ข้อมูลที่จะถูกอัปเดต/วางทับ (Serial No ซ้ำ):</span>
+                    <strong class="text-amber-600" x-text="importPreviewData.updateRows.length + ' รายการ'"></strong>
                 </div>
             </div>
 
@@ -2324,7 +2324,7 @@
                 <i class="fa-solid fa-circle-check"></i>
             </div>
             <h3 class="font-bold text-lg text-slate-800">นำเข้าข้อมูลสำเร็จ</h3>
-            <p class="text-sm text-gray-600">บันทึกข้อมูลเรียบร้อยแล้ว <br>จำนวน: <strong class="text-emerald-600" x-text="importSuccessCount + ' รายการ'"></strong></p>
+            <p class="text-sm text-gray-600">บันทึกข้อมูลเรียบร้อยแล้ว <br>เพิ่มใหม่: <strong class="text-emerald-600" x-text="importSuccessCount + ' รายการ'"></strong> &nbsp;|&nbsp; อัปเดต: <strong class="text-amber-600" x-text="importUpdateCount + ' รายการ'"></strong></p>
             <div class="flex justify-center space-x-3 pt-2">
                 <button @click="showImportResultModal = false" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">ปิด</button>
             </div>
@@ -2338,7 +2338,7 @@
                 <i class="fa-solid fa-triangle-exclamation"></i>
             </div>
             <h3 class="font-bold text-lg text-slate-800">ไม่สามารถนำเข้าข้อมูลได้</h3>
-            <p class="text-sm text-gray-600">ไม่มีข้อมูลใหม่ถูกนำเข้า เนื่องจาก Serial No ซ้ำทั้งหมด</p>
+            <p class="text-sm text-gray-600">ไม่พบข้อมูลในไฟล์ CSV ที่สามารถนำเข้าได้</p>
             <div class="flex justify-center pt-2">
                 <button @click="showImportErrorModal = false" class="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition">ปิด</button>
             </div>
@@ -5630,10 +5630,14 @@
                 showImportErrorModal: false,
                 showValidationWarningModal: false,
                 missingRequiredFields: [],
+                showDuplicateSerialModal: false,
+                pendingDuplicateIndex: null,
+                pendingDuplicateAsset: null,
                 showClearLogModal: false,
                 logCurrentPage: 1,
                 logItemsPerPage: 20,
                 importSuccessCount: 0,
+                importUpdateCount: 0,
                 isEditMode: false,
                 isUserEditMode: false,
                 editIndex: null,
@@ -5641,7 +5645,7 @@
                 userToDelete: null,
                 userForm: { username: '', password: '', warehouses: [] },
                 userFormError: '',
-                importPreviewData: { newRows: [], duplicateSerials: [] },
+                importPreviewData: { newRows: [], updateRows: [] },
 
                 showWarehouseModal: false,
                 showWarehouseDeleteModal: false,
@@ -5651,7 +5655,7 @@
                 warehouseToDelete: null,
 
                 // ===== Branch Master Data =====
-                branchColumns: ['Branch Code', 'Branch Name', 'Branch Area', 'Business Type', 'Last Updated By', 'Last Updated Date', 'Status'],
+                branchColumns: ['Branch Code', 'Branch Name', 'Branch Area', 'Business Type', 'Last Updated By', 'Last Updated Date', 'Status', 'GLBranch'],
                 branches: [],
                 branchForm: {},
                 isBranchEditMode: false,
@@ -5806,10 +5810,10 @@
 
                 columns: [
                     'Asset Code', 'Asset Name', 'Asset Type ID', 'Asset Description', 
-                    'Serial No', 'Tag Barcode', 'Branch Code', 'Product ID', 
+                    'Serial No', 'Tag Barcode', 'Branch Code', 'Branch Name', 'Product ID', 
                     'Seller Supplier Code', 'Service Supplier Code', 'Start Warranty Date', 
                     'End Warranty Date', 'Status', 'Purchase Order No', 
-                    'Operation Device Status', 'Location', 'Remark', 'Asset Number', 
+                    'Operation Device Status', 'Location', 'Remark', 'GLBranch', 'Cost Center', 'Asset FAS', 'Project Code',
                     'Asset Type', 'Requested By', 'Requested Date', 'Warehouse', 'Action', 'Transfer / Use'
                 ],
                 assets: [],
@@ -6537,12 +6541,46 @@
                     if (this.isEditMode) {
                         this.assets[this.editIndex] = { ...this.form };
                         this.logAction('EDIT', serialNo, `แก้ไขข้อมูลทรัพย์สิน: ${assetName}`);
+                        this.saveToStorage();
+                        this.showModal = false;
                     } else {
-                        this.assets.unshift({ ...this.form });
-                        this.logAction('ADD', serialNo, `เพิ่มทรัพย์สินใหม่: ${assetName}`);
+                        // ตรวจสอบว่า Serial No นี้มีอยู่แล้วในระบบหรือไม่ (กรณีเพิ่มใหม่)
+                        // ถ้าพบ Serial No ซ้ำ ให้แสดง Popup แจ้งเตือนก่อน รอผู้ใช้ยืนยันจึงจะอัปเดตทับข้อมูลเดิม
+                        let trimmedSerial = String(this.form['Serial No']).trim();
+                        let existingIndex = this.assets.findIndex(a => (a['Serial No'] || '').trim() === trimmedSerial);
+                        if (existingIndex !== -1) {
+                            this.pendingDuplicateIndex = existingIndex;
+                            this.pendingDuplicateAsset = this.assets[existingIndex];
+                            this.showDuplicateSerialModal = true;
+                            // ไม่บันทึกทันที รอผู้ใช้กดยืนยันใน Popup ก่อน
+                        } else {
+                            this.assets.unshift({ ...this.form });
+                            this.logAction('ADD', serialNo, `เพิ่มทรัพย์สินใหม่: ${assetName}`);
+                            this.saveToStorage();
+                            this.showModal = false;
+                        }
                     }
+                },
+
+                // ผู้ใช้ยืนยันใน Popup ว่าต้องการอัปเดตทับข้อมูลเดิมที่มี Serial No ซ้ำกัน
+                confirmOverwriteDuplicateAsset() {
+                    if (this.pendingDuplicateIndex === null || this.pendingDuplicateIndex === undefined) return;
+                    let serialNo = this.form['Serial No'] || 'N/A';
+                    let assetName = this.form['Asset Name'] || '';
+                    this.assets[this.pendingDuplicateIndex] = { ...this.form };
+                    this.logAction('EDIT', serialNo, `อัปเดตข้อมูลทรัพย์สิน (พบ Serial No ซ้ำ): ${assetName}`);
                     this.saveToStorage();
+                    this.showDuplicateSerialModal = false;
+                    this.pendingDuplicateIndex = null;
+                    this.pendingDuplicateAsset = null;
                     this.showModal = false;
+                },
+
+                // ผู้ใช้ยกเลิกการอัปเดตทับข้อมูลเดิม (ปิด Popup แต่ยังคงเปิดฟอร์ม Add New Asset ไว้ให้แก้ไข)
+                cancelOverwriteDuplicateAsset() {
+                    this.showDuplicateSerialModal = false;
+                    this.pendingDuplicateIndex = null;
+                    this.pendingDuplicateAsset = null;
                 },
 
                 confirmDelete(item) {
@@ -8460,7 +8498,7 @@
                 },
 
                 get requisitionScanFormColumns() {
-                    return this.columns.filter(col => !['Serial No', 'Asset Number', 'Warehouse', 'Action', 'Transfer / Use', 'Requested By'].includes(col));
+                    return this.columns.filter(col => !['Serial No', 'Asset FAS', 'Warehouse', 'Action', 'Transfer / Use', 'Requested By'].includes(col));
                 },
 
                 // อ่านค่า Asset Type Description จาก Master Data > Asset Type โดยจับคู่กับ Asset Type ID ที่ระบุ
@@ -8488,11 +8526,31 @@
                     return [...new Set(this.branches.map(b => b['Branch Code']))].filter(Boolean).sort();
                 },
 
+                // ตัวเลือกสำหรับช่อง GLBranch ในส่วนเพิ่มรายการเบิกอุปกรณ์
+                // ดึงมาจาก Master Data > Branch โดยใช้คอลัมน์ GLBranch เป็นตัวเลือก
+                get requisitionGLBranchOptions() {
+                    return [...new Set(this.branches.map(b => b['GLBranch']))].filter(Boolean).sort();
+                },
+
                 // อ่านค่า Service Supplier Code จาก Master Data > Supplier โดยจับคู่กับ Seller Supplier Code ที่ระบุ (คอลัมน์ Supplier Code)
                 serviceSupplierCodeBySellerCode(sellerSupplierCode) {
                     if (sellerSupplierCode === undefined || sellerSupplierCode === null || String(sellerSupplierCode).trim() === '') return '';
                     let match = this.suppliers.find(s => String(s['Seller Supplier Code'] || '').trim() === String(sellerSupplierCode).trim());
                     return match ? (match['Supplier Code'] || '') : '';
+                },
+
+                // อ่านค่า GLBranch จาก Master Data > Branch โดยจับคู่กับ Branch Code ที่ระบุ (คอลัมน์ GLBranch)
+                glBranchByBranchCode(branchCode) {
+                    if (branchCode === undefined || branchCode === null || String(branchCode).trim() === '') return '';
+                    let match = this.branches.find(b => String(b['Branch Code'] || '').trim() === String(branchCode).trim());
+                    return match ? (match['GLBranch'] || '') : '';
+                },
+
+                // อ่านค่า Branch Name จาก Master Data > Branch โดยจับคู่กับ Branch Code ที่ระบุ (คอลัมน์ Branch Name)
+                branchNameByBranchCode(branchCode) {
+                    if (branchCode === undefined || branchCode === null || String(branchCode).trim() === '') return '';
+                    let match = this.branches.find(b => String(b['Branch Code'] || '').trim() === String(branchCode).trim());
+                    return match ? (match['Branch Name'] || '') : '';
                 },
 
                 get sortedRequisitions() {
@@ -8568,10 +8626,17 @@
                     this.requisitionScanInput = '';
                     if (!code) return;
 
+                    // ตรวจสอบว่า Serial No ที่สแกนได้ ซ้ำกับข้อมูลใน Asset Management (this.assets) หรือไม่
+                    // หากพบว่าซ้ำ ห้ามทำการเบิก (ไม่เพิ่มรายการ) และแจ้งเตือนผู้ใช้ทันที
                     let matchedAsset = this.assets.find(a =>
                         (a['Serial No'] && a['Serial No'].trim() === code) ||
                         (a['Tag Barcode'] && a['Tag Barcode'].trim() === code)
                     );
+                    if (matchedAsset) {
+                        this.showScanFeedback(`ไม่สามารถเบิกได้ เนื่องจาก Serial No "${code}" ซ้ำกับข้อมูลใน Asset Management แล้ว`, 'error');
+                        this.focusScanInput();
+                        return;
+                    }
 
                     let existing = this.requisitionItems.find(it => it['Serial No'] === code);
                     if (existing) {
@@ -8582,31 +8647,29 @@
 
                     let newItem = { _uid: this.makeRequisitionRowId(), 'Quantity': 1 };
                     this.columns.forEach(col => {
-                        newItem[col] = matchedAsset ? (matchedAsset[col] || '') : '';
+                        newItem[col] = '';
                     });
                     newItem['Serial No'] = code;
-                    if (!matchedAsset) {
-                        this.requisitionScanFormColumns.forEach(col => {
-                            let val = this.requisitionScanForm[col];
-                            if (val !== undefined && val !== null && String(val).trim() !== '') {
-                                newItem[col] = val;
-                            }
-                        });
-                    }
+                    this.requisitionScanFormColumns.forEach(col => {
+                        let val = this.requisitionScanForm[col];
+                        if (val !== undefined && val !== null && String(val).trim() !== '') {
+                            newItem[col] = val;
+                        }
+                    });
                     // Asset Type อ่านค่าจาก Asset Type ID เสมอ โดยเทียบกับ Master Data > Asset Type
                     newItem['Asset Type'] = this.assetTypeDescriptionById(newItem['Asset Type ID']);
                     // Service Supplier Code อ่านค่าจาก Seller Supplier Code เสมอ โดยเทียบกับ Master Data > Supplier
                     newItem['Service Supplier Code'] = this.serviceSupplierCodeBySellerCode(newItem['Seller Supplier Code']);
+                    // GLBranch อ่านค่าจาก Branch Code เสมอ โดยเทียบกับ Master Data > Branch
+                    newItem['GLBranch'] = this.glBranchByBranchCode(newItem['Branch Code']);
+                    // Branch Name อ่านค่าจาก Branch Code เสมอ โดยเทียบกับ Master Data > Branch
+                    newItem['Branch Name'] = this.branchNameByBranchCode(newItem['Branch Code']);
                     // Status ของรายการที่เพิ่มในส่วนเพิ่มรายการเบิกอุปกรณ์ ให้เท่ากับ A เสมอ
                     newItem['Status'] = 'A';
                     this.requisitionItems.push(newItem);
                     this.requisitionItemsCurrentPage = this.requisitionItemsTotalPages;
 
-                    if (matchedAsset) {
-                        this.showScanFeedback(`เพิ่ม ${matchedAsset['Asset Type'] || code} (Serial: ${code}) แล้ว`, 'success');
-                    } else {
-                        this.showScanFeedback(`เพิ่มรายการใหม่ Serial No "${code}" (ไม่พบใน Master ข้อมูล กรุณาระบุข้อมูลเพิ่มเติม)`, 'success');
-                    }
+                    this.showScanFeedback(`เพิ่มรายการใหม่ Serial No "${code}" แล้ว (ไม่พบใน Master ข้อมูล กรุณาระบุข้อมูลเพิ่มเติม)`, 'success');
                     this.focusScanInput();
                 },
 
@@ -8623,6 +8686,10 @@
                     newItem['Asset Type'] = this.assetTypeDescriptionById(newItem['Asset Type ID']);
                     // Service Supplier Code อ่านค่าจาก Seller Supplier Code เสมอ โดยเทียบกับ Master Data > Supplier
                     newItem['Service Supplier Code'] = this.serviceSupplierCodeBySellerCode(newItem['Seller Supplier Code']);
+                    // GLBranch อ่านค่าจาก Branch Code เสมอ โดยเทียบกับ Master Data > Branch
+                    newItem['GLBranch'] = this.glBranchByBranchCode(newItem['Branch Code']);
+                    // Branch Name อ่านค่าจาก Branch Code เสมอ โดยเทียบกับ Master Data > Branch
+                    newItem['Branch Name'] = this.branchNameByBranchCode(newItem['Branch Code']);
                     // Status ของรายการที่เพิ่มในส่วนเพิ่มรายการเบิกอุปกรณ์ ให้เท่ากับ A เสมอ
                     newItem['Status'] = 'A';
                     this.requisitionItems.push(newItem);
@@ -8682,6 +8749,51 @@
                     this.requisitionScanInput = '';
                 },
 
+                // getter สำหรับตรวจสอบว่ามี Serial No ซ้ำกันในรายการอุปกรณ์ที่จะเบิกหรือไม่ (ใช้แสดงผล/ปิดปุ่มบันทึก)
+                get hasDuplicateRequisitionSerials() {
+                    return this.findDuplicateSerialsInRequisitionItems().length > 0;
+                },
+
+                // เรียกเมื่อผู้ใช้แก้ไข Serial No ของรายการในตาราง "รายการอุปกรณ์ที่จะเบิก" โดยตรง (inline edit)
+                // หากค่าที่กรอกซ้ำกับ Serial No ของรายการอื่นในรายการเดียวกัน ให้แจ้งเตือนและล้างค่ากลับทันที
+                // เพื่อห้ามไม่ให้มี Serial No ซ้ำเกิดขึ้นในรายการที่จะเบิกเลย
+                onRequisitionSerialNoChange(item) {
+                    const serial = (item['Serial No'] || '').trim();
+                    if (!serial) return;
+                    // ตรวจสอบกับข้อมูล Asset Management ก่อน หากซ้ำ ห้ามทำการเบิก
+                    const matchedAsset = this.assets.find(a =>
+                        (a['Serial No'] && a['Serial No'].trim() === serial) ||
+                        (a['Tag Barcode'] && a['Tag Barcode'].trim() === serial)
+                    );
+                    if (matchedAsset) {
+                        alert('ไม่สามารถเพิ่ม/แก้ไขรายการได้ เนื่องจาก Serial No "' + serial + '" ซ้ำกับข้อมูลใน Asset Management แล้ว');
+                        item['Serial No'] = '';
+                        return;
+                    }
+                    const isDuplicate = this.requisitionItems.some(other => other !== item && (other['Serial No'] || '').trim() === serial);
+                    if (isDuplicate) {
+                        alert('ไม่สามารถเพิ่ม/แก้ไขรายการได้ เนื่องจากพบ Serial No "' + serial + '" ซ้ำกับรายการอื่นในรายการที่จะเบิกนี้แล้ว');
+                        item['Serial No'] = '';
+                    }
+                },
+
+                // ตรวจสอบว่ามี Serial No ซ้ำกันภายในรายการอุปกรณ์ที่จะเบิก (requisitionItems) หรือไม่
+                // คืนค่าเป็น array ของ Serial No ที่ซ้ำกัน (ไม่นับ Serial No ที่ว่างเปล่า)
+                findDuplicateSerialsInRequisitionItems() {
+                    const seen = new Set();
+                    const duplicates = new Set();
+                    this.requisitionItems.forEach(item => {
+                        const serial = (item['Serial No'] || '').trim();
+                        if (!serial) return; // ไม่ตรวจสอบรายการที่ยังไม่มี Serial No
+                        if (seen.has(serial)) {
+                            duplicates.add(serial);
+                        } else {
+                            seen.add(serial);
+                        }
+                    });
+                    return Array.from(duplicates);
+                },
+
                 submitRequisition() {
                     if (this.requisitionItems.length === 0) return;
                     if (!this.requisitionForm.requestedBy || !this.requisitionForm.requestedBy.trim()) {
@@ -8690,6 +8802,12 @@
                     }
                     if (!this.requisitionForm.requestDept || !this.requisitionForm.requestDept.trim()) {
                         alert('กรุณาเลือก Warehouse / Hub ก่อนบันทึกใบเบิก');
+                        return;
+                    }
+                    // ตรวจสอบ Serial No ซ้ำกันภายในรายการอุปกรณ์ที่จะเบิก ห้ามบันทึกใบเบิกหากพบ Serial No ซ้ำ
+                    const duplicateSerialCheck = this.findDuplicateSerialsInRequisitionItems();
+                    if (duplicateSerialCheck.length > 0) {
+                        alert('ไม่สามารถบันทึกใบเบิกได้ เนื่องจากพบ Serial No ซ้ำกันในรายการ: ' + duplicateSerialCheck.join(', '));
                         return;
                     }
                     const now = new Date();
@@ -8811,15 +8929,44 @@
                     this.showRequisitionViewModal = true;
                 },
 
+                // Export ใบเบิกอุปกรณ์ 1 ใบ (ตามเลขที่ใบเบิก) เป็นไฟล์ Excel
+                // แต่ละแถวในไฟล์ = 1 รายการอุปกรณ์ในใบเบิกนั้น พร้อมข้อมูลหัวใบเบิกกำกับไว้ทุกแถว
+                exportRequisitionToExcel(req) {
+                    if (!req || !req.items || req.items.length === 0) {
+                        alert('ใบเบิกนี้ไม่มีรายการอุปกรณ์สำหรับ Export');
+                        return;
+                    }
+                    // คอลัมน์รายการอุปกรณ์: ใช้ชุดคอลัมน์หลักของระบบ (this.columns) บวก Quantity
+                    let itemCols = [...this.columns, 'Quantity'];
+                    let dataForExport = req.items.map((item, idx) => {
+                        let row = {
+                            'เลขที่ใบเบิก': req.docNo || '',
+                            'วันที่': req.createdAt || '',
+                            'ผู้ขอเบิก': req.requestedBy || '',
+                            'Warehouse': req.requestDept || '',
+                            'ลำดับ': idx + 1
+                        };
+                        itemCols.forEach(col => { row[col] = item[col] !== undefined && item[col] !== null ? item[col] : ''; });
+                        return row;
+                    });
+                    let header = ['เลขที่ใบเบิก', 'วันที่', 'ผู้ขอเบิก', 'Warehouse', 'ลำดับ', ...itemCols];
+                    let ws = XLSX.utils.json_to_sheet(dataForExport, { header: header });
+                    let wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, 'Requisition');
+                    let fileName = `Requisition_${req.docNo || 'Unknown'}.xlsx`;
+                    XLSX.writeFile(wb, fileName);
+                    this.logAction('EXPORT', req.docNo || '-', `Export ใบเบิกอุปกรณ์ ${req.docNo} เป็น Excel จำนวน ${dataForExport.length} รายการ`);
+                },
+
                 printRequisitionDetail() {
                     window.print();
                 },
 
-                // คืนค่า array ของเลขหน้า [0,1,2,...] สำหรับแบ่งพิมพ์ใบเบิกทีละ 25 แถวต่อหน้า
+                // คืนค่า array ของเลขหน้า [0,1,2,...] สำหรับแบ่งพิมพ์ใบเบิกทีละ 30 แถวต่อหน้า
                 // (เดิม hardcode Array.from({length:25}) แถวเดียว ทำให้รายการเกิน 25 ไม่ถูกพิมพ์)
                 requisitionPrintPages() {
                     const items = (this.viewRequisition && this.viewRequisition.items) ? this.viewRequisition.items : [];
-                    const rowsPerPage = 25;
+                    const rowsPerPage = 30;
                     const pageCount = Math.max(1, Math.ceil(items.length / rowsPerPage));
                     return Array.from({ length: pageCount }, (_, i) => i);
                 },
@@ -8919,8 +9066,8 @@
                         let headers = parseCSVLine(lines[0]);
                         let newRows = [];
                         let existingSerialSet = new Set(this.assets.map(a => a['Serial No']).filter(Boolean));
-                        let fileSerialSet = new Set();
-                        let duplicateSerials = [];
+                        // เก็บแถวที่มี Serial No ไว้ใน Map เพื่อให้ถ้ามีซ้ำกันเองในไฟล์ CSV แถวหลังสุดจะทับแถวก่อนหน้า
+                        let serialRowMap = new Map();
 
                         for (let i = 1; i < lines.length; i++) {
                             let data = parseCSVLine(lines[i]);
@@ -8932,16 +9079,23 @@
 
                             let serialNo = obj['Serial No'] ? obj['Serial No'].trim() : '';
                             if (serialNo !== '') {
-                                if (existingSerialSet.has(serialNo) || fileSerialSet.has(serialNo)) {
-                                    duplicateSerials.push(serialNo);
-                                    continue;
-                                }
-                                fileSerialSet.add(serialNo);
+                                serialRowMap.set(serialNo, obj);
+                            } else {
+                                newRows.push(obj);
                             }
-                            newRows.push(obj);
                         }
 
-                        this.importPreviewData = { newRows, duplicateSerials };
+                        // ถ้า Serial No ซ้ำกับข้อมูลเดิมในระบบ ให้จัดเป็นรายการ "อัปเดต" (วางทับ) แทนการข้าม
+                        let updateRows = [];
+                        serialRowMap.forEach((obj, serialNo) => {
+                            if (existingSerialSet.has(serialNo)) {
+                                updateRows.push(obj);
+                            } else {
+                                newRows.push(obj);
+                            }
+                        });
+
+                        this.importPreviewData = { newRows, updateRows };
                         this.showImportModal = true;
                         event.target.value = '';
                     };
@@ -8949,11 +9103,22 @@
                 },
 
                 executeImportCSV() {
-                    if (this.importPreviewData.newRows.length > 0) {
-                        this.importSuccessCount = this.importPreviewData.newRows.length;
+                    let newCount = this.importPreviewData.newRows.length;
+                    let updateCount = this.importPreviewData.updateRows.length;
+                    if (newCount > 0 || updateCount > 0) {
+                        // วางทับข้อมูลเดิมสำหรับรายการที่ Serial No ซ้ำ
+                        this.importPreviewData.updateRows.forEach(row => {
+                            let idx = this.assets.findIndex(a => a['Serial No'] === row['Serial No']);
+                            if (idx !== -1) {
+                                this.assets[idx] = { ...this.assets[idx], ...row };
+                            }
+                        });
+                        // เพิ่มรายการใหม่เข้าไปในระบบ
                         this.assets = this.importPreviewData.newRows.concat(this.assets);
+                        this.importSuccessCount = newCount;
+                        this.importUpdateCount = updateCount;
                         this.saveToStorage();
-                        this.logAction('IMPORT', 'BATCH-IMPORT', `นำเข้าข้อมูลผ่านไฟล์ CSV จำนวน ${this.importSuccessCount} รายการ`);
+                        this.logAction('IMPORT', 'BATCH-IMPORT', `นำเข้าข้อมูลผ่านไฟล์ CSV จำนวน ${newCount} รายการใหม่ และอัปเดตข้อมูลเดิม (Serial No ซ้ำ) ${updateCount} รายการ`);
                         this.showImportModal = false;
                         this.showImportResultModal = true;
                         this.currentPage = 1;
@@ -8961,10 +9126,21 @@
                         this.showImportModal = false;
                         this.showImportErrorModal = true;
                     }
-                    this.importPreviewData = { newRows: [], duplicateSerials: [] };
+                    this.importPreviewData = { newRows: [], updateRows: [] };
                 }
             }
         }
     </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
