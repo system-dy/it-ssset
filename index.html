@@ -2191,17 +2191,17 @@
                         </table>
 
                         <div>
-                            <div style="font-size:7pt; margin-top:1mm;">&nbsp;</div>
+                            <div style="font-size:7pt; margin-top:0mm;">&nbsp;</div>
                             <div style="font-size:7pt;">ได้ตรวจรับมอบอุปกรณ์ตามจำนวนดังระบุข้างต้นไว้ครบถ้วนเรียบร้อย</div>
-                            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6mm; text-align:center; font-size:10pt; margin-top:-2mm;">
-             
-                                <div><div style="height:8mm;"></div><div>ผู้ขอเบิกอุปกรณ์</div><div style="margin-top:9mm;">( <span x-text="viewRequisition ? viewRequisition.requestedBy : ''"></span> )</div><div>วันที่ ……. / ……... / ………….</div></div>
-                                <div><div style="height:8mm;"></div><div>ผู้ส่งอุปกรณ์</div><div style="margin-top:9mm;">(........................................)</div><div>วันที่ ……. / ……... / ………….</div></div>
-                                <div><div style="height:8mm;"></div><div>ผู้อนุมัติให้ดำเนินการ</div><div style="margin-top:9mm;">(........................................)</div><div>วันที่ ……. / ……... / ………….</div></div>
-                               <div><div style="height:-3mm;"></div><div>ผู้ตรวจสอบ (LP)</div><div style="margin-top:9mm;">(........................................)</div><div>วันที่ ……. / ……... / ………….</div></div>
-                            </div>
-                            <div style="font-size:10pt; margin-top:12mm; line-height:1.55;">หมายเหตุ :    <span x-text="(viewRequisition && viewRequisition.items.length) ? [viewRequisition.items[0]['Branch Code'], viewRequisition.items[0]['GLBranch'], viewRequisition.items[0]['Branch Name']].filter(Boolean).join(' - ') : ''"></span></div>
-                                                        <p style="font-size:7pt; text-align:center; margin:4mm 0 0;">เบอรี่ ยุคเกอร์ หรือ BJC ซอยรูเปีย ถนนสุขุมวิท 42 แขวงพระโขนง เขตคลองเตย กทม. 10110 อาคาร B ชั้น 11 แผนก MIS</p>
+                            <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:4mm; text-align:center; font-size:10pt; margin-top:1mm;">
+    <div style="border:0.5pt solid #000; border-radius:1mm; padding:2mm 1.5mm;"><div style="height:4mm;"></div><div>ผู้ขอเบิกอุปกรณ์</div><div style="margin-top:9mm;">( <span x-text="viewRequisition ? viewRequisition.requestedBy : ''"></span> )</div><div>วันที่ ……. / ……... / ………….</div></div>
+    <div style="border:0.5pt solid #000; border-radius:1mm; padding:2mm 1.5mm;"><div style="height:4mm;"></div><div>ผู้ส่งอุปกรณ์</div><div style="margin-top:9mm;">(........................................)</div><div>วันที่ ……. / ……... / ………….</div></div>
+    <div style="border:0.5pt solid #000; border-radius:1mm; padding:2mm 1.5mm;"><div style="height:4mm;"></div><div>ผู้อนุมัติให้ดำเนินการ</div><div style="margin-top:9mm;">(........................................)</div><div>วันที่ ……. / ……... / ………….</div></div>
+    <div style="border:0.5pt solid #000; border-radius:1mm; padding:2mm 1.5mm; margin-top:0mm;"><div style="height:4mm;"></div><div>ผู้ตรวจสอบ (LP)</div><div style="margin-top:9mm;">(........................................)</div><div>วันที่ ……. / ……... / ………….</div></div>
+
+</div>
+                            <div style="font-size:10pt; margin-top:3mm; line-height:1.55;">หมายเหตุ :    <span x-text="(viewRequisition && viewRequisition.items.length) ? [viewRequisition.items[0]['Branch Code'], viewRequisition.items[0]['GLBranch'], viewRequisition.items[0]['Branch Name']].filter(Boolean).join(' - ') : ''"></span></div>
+                                                        <p style="font-size:8pt; text-align:center; margin:4mm 0 0;">เบอรี่ ยุคเกอร์ หรือ BJC ซอยรูเปีย ถนนสุขุมวิท 42 แขวงพระโขนง เขตคลองเตย กทม. 10110 อาคาร B ชั้น 11 แผนก MIS</p>
                         </div>
                     </div>
                     </template>
